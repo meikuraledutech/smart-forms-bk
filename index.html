@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>API Status Check</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f5f7fa;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+
+      .card {
+        background: white;
+        padding: 24px 32px;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        min-width: 300px;
+      }
+
+      h2 {
+        margin-top: 0;
+      }
+
+      pre {
+        background: #eee;
+        padding: 12px;
+        border-radius: 6px;
+        overflow-x: auto;
+      }
+
+      button {
+        margin-top: 12px;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        background: #2563eb;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h2>Backend Status</h2>
+      <pre id="output">Loading...</pre>
+      <button onclick="checkStatus()">Refresh</button>
+    </div>
+
+    <script>
+      const API_URL = "https://219590kl-3030.inc1.devtunnels.ms/status";
+
+      async function checkStatus() {
+        const output = document.getElementById("output");
+        output.textContent = "Checking...";
+
+        try {
+          const res = await fetch(API_URL);
+          const data = await res.json();
+          output.textContent = JSON.stringify(data, null, 2);
+        } catch (err) {
+          output.textContent = "Error: " + err.message;
+        }
+      }
+
+      // Auto-run on load
+      checkStatus();
+    </script>
+  </body>
+</html>

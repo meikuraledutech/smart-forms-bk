@@ -1,0 +1,81 @@
+AUTH MODULE – README
+
+This project implements a simple JWT-based authentication system
+using Go (Fiber), PostgreSQL (Neon), and raw SQL.
+
+FEATURES
+- Register (username + password)
+- Login (JWT access + refresh token)
+- Refresh access token
+- Password hashing using bcrypt
+- Raw SQL migrations
+- No ORM
+- Future-ready for Redis, roles, pricing
+
+AUTH ENDPOINTS
+
+1. Register
+POST /auth/register
+Body:
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+Responses:
+- 201: user registered successfully
+- 409: user already registered
+
+2. Login
+POST /auth/login
+Body:
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+Response:
+{
+  "access_token": "...",
+  "refresh_token": "..."
+}
+
+3. Refresh Access Token
+POST /auth/refresh
+Body:
+{
+  "refresh_token": "..."
+}
+
+Response:
+{
+  "access_token": "..."
+}
+
+TOKEN STRATEGY
+- Access token: short-lived
+- Refresh token: long-lived
+- Refresh token is NOT rotated (static strategy)
+- Login required only when refresh token expires
+
+ENV VARIABLES REQUIRED
+- DATABASE_URL
+- ACCESS_TOKEN_SECRET
+- REFRESH_TOKEN_SECRET
+
+MIGRATIONS
+- Raw SQL only
+- Run via Go commands
+- Files:
+  migrations/001_create_users.up.sql
+  migrations/001_create_users.down.sql
+
+FUTURE EXTENSIONS (NOT IMPLEMENTED)
+- Redis token blacklist
+- Refresh token rotation
+- Logout
+- Roles and pricing
+- JWT middleware for protected routes
+
+STATUS
+Auth core is complete and working.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"smart-forms/internal/auth"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -45,6 +46,18 @@ func main() {
 	// Routes
 	app.Get("/", helloHandler)
 	app.Get("/status", statusHandler)
+
+	// auth setup
+	authRepo := auth.NewAuthRepository(db)
+	authService := auth.NewAuthService(authRepo)
+	authHandler := auth.NewAuthHandler(authService)
+
+	// routes
+	app.Post("/auth/login", authHandler.Login)
+	app.Post("/auth/refresh", authHandler.Refresh)
+	app.Post("/auth/register", authHandler.Register)
+
+
 
 	port := os.Getenv("PORT")
 	if port == "" {

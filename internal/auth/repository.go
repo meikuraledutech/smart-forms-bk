@@ -26,7 +26,11 @@ func NewAuthRepository(db *pgxpool.Pool) *AuthRepository {
 	return &AuthRepository{db: db}
 }
 
-// CreateUser inserts a new user
+/*
+========================
+ CREATE USER
+========================
+*/
 func (r *AuthRepository) CreateUser(
 	ctx context.Context,
 	username string,
@@ -42,7 +46,11 @@ func (r *AuthRepository) CreateUser(
 	return err
 }
 
-// GetUserByUsername fetches user by username
+/*
+========================
+ GET USER BY USERNAME
+========================
+*/
 func (r *AuthRepository) GetUserByUsername(
 	ctx context.Context,
 	username string,

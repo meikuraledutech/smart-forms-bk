@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"smart-forms/internal/auth"
+	"smart-forms/internal/forms"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -58,6 +59,19 @@ func main() {
 	app.Post("/auth/login", authHandler.Login)
 	app.Post("/auth/refresh", authHandler.Refresh)
 	app.Post("/auth/register", authHandler.Register)
+
+	formsRepo := forms.NewFormsRepository(db)
+formsService := forms.NewFormsService(formsRepo)
+formsHandler := forms.NewFormsHandler(formsService)
+
+// Protect routes
+api := app.Group("/", auth.JWTAuthMiddleware())
+
+api.Post("/forms", formsHandler.Create)
+api.Get("/forms", formsHandler.List)
+api.Get("/forms/:id", formsHandler.GetByID)
+api.Patch("/forms/:id", formsHandler.Update)
+api.Patch("/forms/:id/delete", formsHandler.SoftDelete)
 
 	port := os.Getenv("PORT")
 	if port == "" {

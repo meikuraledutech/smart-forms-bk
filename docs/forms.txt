@@ -1,0 +1,113 @@
+FORMS MODULE – README
+
+This module implements form creation and management
+using Go (Fiber), PostgreSQL, and raw SQL.
+
+FEATURES
+- Create forms
+- List forms (pagination + search)
+- Get form by ID
+- Update form (PATCH)
+- Soft delete forms
+- User-scoped access (JWT)
+- Raw SQL only
+- No ORM
+- UTC-based timestamps
+
+FORM MODEL
+- id (uuid)
+- user_id (owner)
+- title
+- description
+- status (draft | published)
+- created_at (UTC)
+- updated_at (UTC)
+- deleted_at (soft delete)
+
+FORM ENDPOINTS
+
+1. Create Form
+POST /forms
+Headers:
+Authorization: Bearer <access_token>
+
+Body:
+{
+  "title": "Student Feedback",
+  "description": "Feedback form"
+}
+
+Response:
+- 201: form created
+
+2. List Forms
+GET /forms
+Headers:
+Authorization: Bearer <access_token>
+
+Query Params:
+- limit (default 10)
+- offset (default 0)
+- search (optional, title)
+
+Response:
+{
+  "items": [...],
+  "total": 10,
+  "limit": 10,
+  "offset": 0
+}
+
+3. Get Form by ID
+GET /forms/:id
+Headers:
+Authorization: Bearer <access_token>
+
+Response:
+- 200: form data
+- 404: not found
+
+4. Update Form
+PATCH /forms/:id
+Headers:
+Authorization: Bearer <access_token>
+
+Body:
+{
+  "title": "Updated title",
+  "description": "Updated description",
+  "status": "published"
+}
+
+Response:
+- 204: updated
+
+5. Soft Delete Form
+PATCH /forms/:id/delete
+Headers:
+Authorization: Bearer <access_token>
+
+Response:
+- 204: deleted
+
+RULES
+- Forms are user-owned
+- Deleted forms are excluded from all queries
+- Only PATCH, POST, GET (no PUT/DELETE)
+- List ordered by updated_at DESC
+
+MIGRATIONS
+- Raw SQL only
+- Files:
+  migrations/002_create_forms.up.sql
+  migrations/002_create_forms.down.sql
+
+FUTURE EXTENSIONS (NOT IMPLEMENTED)
+- Form fields
+- Form responses
+- Sharing/public forms
+- Role-based access
+- Analytics
+
+STATUS
+Forms core is complete and working.

@@ -36,7 +36,7 @@ func main() {
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: os.Getenv("CORS_ORIGINS"),
 		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization, ngrok-skip-browser-warning",
 	}))
 
 	// Custom ENV middleware

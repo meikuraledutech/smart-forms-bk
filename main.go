@@ -4,17 +4,18 @@ import (
 	"context"
 	"log"
 	"os"
-	"smart-forms/internal/auth"
 	"time"
+
+	"smart-forms/internal/auth"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
-var db *pgx.Conn
+var db *pgxpool.Pool
 
 func main() {
 	// Load environment variables
@@ -22,8 +23,9 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	// Connect to DB
+	// Connect to DB (POOL)
 	db = connectDB()
+	defer db.Close()
 
 	app := fiber.New()
 
@@ -47,17 +49,15 @@ func main() {
 	app.Get("/", helloHandler)
 	app.Get("/status", statusHandler)
 
-	// auth setup
+	// Auth setup
 	authRepo := auth.NewAuthRepository(db)
 	authService := auth.NewAuthService(authRepo)
 	authHandler := auth.NewAuthHandler(authService)
 
-	// routes
+	// Auth routes
 	app.Post("/auth/login", authHandler.Login)
 	app.Post("/auth/refresh", authHandler.Refresh)
 	app.Post("/auth/register", authHandler.Register)
-
-
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -83,7 +83,6 @@ func statusHandler(c *fiber.Ctx) error {
 
 	err := db.Ping(ctx)
 	dbStatus := "connected"
-
 	if err != nil {
 		dbStatus = "disconnected"
 	}
@@ -96,17 +95,24 @@ func statusHandler(c *fiber.Ctx) error {
 
 // ---------------- DB ----------------
 
-func connectDB() *pgx.Conn {
+func connectDB() *pgxpool.Pool {
 	connStr := os.Getenv("DATABASE_URL")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	conn, err := pgx.Connect(ctx, connStr)
+	// Use context.Background() for long-lived pool
+	// pgxpool manages its own connection lifecycle and timeouts
+	pool, err := pgxpool.New(context.Background(), connStr)
 	if err != nil {
 		log.Fatal("Database connection failed:", err)
 	}
 
-	log.Println("Database connected successfully")
-	return conn
+	// Verify connection with a ping
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := pool.Ping(ctx); err != nil {
+		log.Fatal("Database ping failed:", err)
+	}
+
+	log.Println("Database pool created and verified successfully")
+	return pool
 }

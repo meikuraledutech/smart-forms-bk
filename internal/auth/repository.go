@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // User represents auth user (internal use only)
@@ -17,11 +18,11 @@ type User struct {
 
 // AuthRepository handles raw SQL for auth
 type AuthRepository struct {
-	db *pgx.Conn
+	db *pgxpool.Pool
 }
 
 // NewAuthRepository creates a new repo
-func NewAuthRepository(db *pgx.Conn) *AuthRepository {
+func NewAuthRepository(db *pgxpool.Pool) *AuthRepository {
 	return &AuthRepository{db: db}
 }
 
@@ -65,7 +66,7 @@ func (r *AuthRepository) GetUserByUsername(
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil // user not found (important)
+			return nil, nil // user not found
 		}
 		return nil, err
 	}

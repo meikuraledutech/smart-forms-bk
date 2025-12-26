@@ -18,11 +18,6 @@ func main() {
 		log.Fatal("DATABASE_URL not set")
 	}
 
-	sqlBytes, err := os.ReadFile("migrations/001_create_users.down.sql")
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -33,7 +28,15 @@ func main() {
 	defer conn.Close(ctx)
 
 	fmt.Println("⚠️  Cleaning database...")
-	_, err = conn.Exec(ctx, string(sqlBytes))
+
+	// Drop all tables in correct order (reverse of creation)
+	dropSQL := `
+		DROP TABLE IF EXISTS questions CASCADE;
+		DROP TABLE IF EXISTS forms CASCADE;
+		DROP TABLE IF EXISTS users CASCADE;
+	`
+
+	_, err = conn.Exec(ctx, dropSQL)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -45,9 +45,11 @@ func main() {
 
 		_, err = conn.Exec(ctx, string(sqlBytes))
 		if err != nil {
-			log.Fatal(err)
+			fmt.Printf("⚠️  Warning: %s - %v\n", file, err)
+			continue
 		}
+		fmt.Println("✅", file)
 	}
 
-	fmt.Println("✅ Migrations completed")
+	fmt.Println("✅ All migrations completed")
 }

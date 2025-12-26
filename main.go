@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"smart-forms/internal/auth"
+	"smart-forms/internal/flows"
 	"smart-forms/internal/forms"
 	"smart-forms/internal/questions"
 
@@ -69,6 +70,10 @@ func main() {
 	questionService := questions.NewQuestionService(questionRepo)
 	questionHandler := questions.NewQuestionHandler(questionService)
 
+	flowRepo := flows.NewFlowRepository(db)
+	flowService := flows.NewFlowService(flowRepo)
+	flowHandler := flows.NewFlowHandler(flowService)
+
 	// Protect routes
 	api := app.Group("/", auth.JWTAuthMiddleware())
 
@@ -85,6 +90,10 @@ func main() {
 	api.Get("/questions/:id", questionHandler.GetByID)
 	api.Patch("/questions/:id", questionHandler.Update)
 	api.Delete("/questions/:id", questionHandler.Delete)
+
+	// Flow routes
+	api.Patch("/forms/:form_id/flow", flowHandler.UpdateFlow)
+	api.Get("/forms/:form_id/flow", flowHandler.GetFlow)
 
 	port := os.Getenv("PORT")
 	if port == "" {

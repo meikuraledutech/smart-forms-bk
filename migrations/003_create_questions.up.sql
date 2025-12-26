@@ -11,6 +11,6 @@ CREATE TABLE IF NOT EXISTS questions (
     deleted_at TIMESTAMP
 );
 
-CREATE INDEX idx_questions_type ON questions(type);
-CREATE INDEX idx_questions_created_by ON questions(created_by);
-CREATE INDEX idx_questions_created_at ON questions(created_at);
+CREATE INDEX IF NOT EXISTS idx_questions_type ON questions(type);
+CREATE INDEX IF NOT EXISTS idx_questions_created_by ON questions(created_by);
+CREATE INDEX IF NOT EXISTS idx_questions_created_at ON questions(created_at);

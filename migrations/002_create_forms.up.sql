@@ -1,7 +1,7 @@
 -- Enable trigram extension (safe if already exists)
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-CREATE TABLE forms (
+CREATE TABLE IF NOT EXISTS forms (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
 
@@ -16,6 +16,6 @@ CREATE TABLE forms (
     deleted_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_forms_user_id ON forms(user_id);
-CREATE INDEX idx_forms_updated_at ON forms(updated_at DESC);
-CREATE INDEX idx_forms_title ON forms USING GIN (title gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_forms_user_id ON forms(user_id);
+CREATE INDEX IF NOT EXISTS idx_forms_updated_at ON forms(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_forms_title ON forms USING GIN (title gin_trgm_ops);

@@ -8,6 +8,7 @@ import (
 
 	"smart-forms/internal/auth"
 	"smart-forms/internal/forms"
+	"smart-forms/internal/questions"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -61,17 +62,29 @@ func main() {
 	app.Post("/auth/register", authHandler.Register)
 
 	formsRepo := forms.NewFormsRepository(db)
-formsService := forms.NewFormsService(formsRepo)
-formsHandler := forms.NewFormsHandler(formsService)
+	formsService := forms.NewFormsService(formsRepo)
+	formsHandler := forms.NewFormsHandler(formsService)
 
-// Protect routes
-api := app.Group("/", auth.JWTAuthMiddleware())
+	questionRepo := questions.NewQuestionRepository(db)
+	questionService := questions.NewQuestionService(questionRepo)
+	questionHandler := questions.NewQuestionHandler(questionService)
 
-api.Post("/forms", formsHandler.Create)
-api.Get("/forms", formsHandler.List)
-api.Get("/forms/:id", formsHandler.GetByID)
-api.Patch("/forms/:id", formsHandler.Update)
-api.Patch("/forms/:id/delete", formsHandler.SoftDelete)
+	// Protect routes
+	api := app.Group("/", auth.JWTAuthMiddleware())
+
+	// Forms routes
+	api.Post("/forms", formsHandler.Create)
+	api.Get("/forms", formsHandler.List)
+	api.Get("/forms/:id", formsHandler.GetByID)
+	api.Patch("/forms/:id", formsHandler.Update)
+	api.Patch("/forms/:id/delete", formsHandler.SoftDelete)
+
+	// Questions routes
+	api.Post("/questions", questionHandler.Create)
+	api.Get("/questions", questionHandler.List)
+	api.Get("/questions/:id", questionHandler.GetByID)
+	api.Patch("/questions/:id", questionHandler.Update)
+	api.Delete("/questions/:id", questionHandler.Delete)
 
 	port := os.Getenv("PORT")
 	if port == "" {

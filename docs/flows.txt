@@ -1,0 +1,215 @@
+FLOWS MODULE – README
+
+This module implements dynamic form flow/tree structures
+using Go (Fiber), PostgreSQL, and raw SQL.
+
+FEATURES
+- Create/update form flows (tree structure)
+- Get flow by form ID
+- Auto-create questions from flow
+- PATCH-based updates (replaces entire flow)
+- Returns ID mapping (frontend ↔ database)
+- Recursive tree processing
+- Form ownership validation
+- User-scoped access (JWT)
+- Raw SQL only
+- No ORM
+- Soft delete support
+
+FLOW CONNECTION MODEL
+- id (uuid)
+- form_id (FK → forms.id)
+- question_id (FK → questions.id)
+- parent_id (self-reference, nullable)
+- order_index (sibling ordering)
+- depth_level (distance from root)
+- is_terminal (leaf node flag)
+- created_at
+- updated_at
+- deleted_at (soft delete)
+
+FLOW ENDPOINTS
+
+1. Update Flow (Create/Replace)
+PATCH /forms/:form_id/flow
+Headers:
+Authorization: Bearer <access_token>
+
+Body:
+{
+  "blocks": [
+    {
+      "id": "1766738655070",
+      "type": "question",
+      "question": "Department",
+      "children": [
+        {
+          "id": "1766739095856",
+          "type": "option",
+          "question": "Mechanical",
+          "children": []
+        }
+      ]
+    }
+  ]
+}
+
+Response:
+{
+  "message": "Flow updated successfully",
+  "mapping": {
+    "1766738655070": "uuid-from-db",
+    "1766739095856": "uuid-from-db-2"
+  }
+}
+
+Example:
+TOKEN="your_access_token"
+FORM_ID="form-uuid-here"
+curl -X PATCH "http://localhost:3030/forms/$FORM_ID/flow" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "blocks": [
+      {
+        "id": "1766738655070",
+        "type": "question",
+        "question": "Department",
+        "children": [
+          {
+            "id": "1766739095856",
+            "type": "option",
+            "question": "Mechanical",
+            "children": []
+          }
+        ]
+      }
+    ]
+  }'
+
+2. Get Flow
+GET /forms/:form_id/flow
+Headers:
+Authorization: Bearer <access_token>
+
+Response:
+{
+  "blocks": [
+    {
+      "id": "uuid-from-db",
+      "type": "question",
+      "question": "Department",
+      "children": [
+        {
+          "id": "uuid-from-db-2",
+          "type": "option",
+          "question": "Mechanical",
+          "children": [
+            {
+              "id": "uuid-from-db-3",
+              "type": "question",
+              "question": "What is your employee ID?",
+              "children": null
+            }
+          ]
+        },
+        {
+          "id": "uuid-from-db-4",
+          "type": "option",
+          "question": "Computer Science",
+          "children": null
+        }
+      ]
+    }
+  ]
+}
+
+Note: Returns reconstructed tree structure in the same format as PATCH input.
+Empty children arrays may be null instead of [].
+
+Example:
+TOKEN="your_access_token"
+FORM_ID="form-uuid-here"
+curl -X GET "http://localhost:3030/forms/$FORM_ID/flow" \
+  -H "Authorization: Bearer $TOKEN"
+
+FLOW LOGIC
+
+1. PATCH Flow
+- Verifies user owns form
+- Soft deletes existing flow
+- Processes blocks recursively:
+  - Finds or creates question
+  - Creates flow_connection
+  - Maps frontend ID → DB UUID
+- Returns ID mapping to frontend
+
+2. GET Flow
+- Verifies user owns form
+- Fetches flow_connections with questions (JOIN)
+- Reconstructs tree structure recursively
+- Returns nested blocks format
+
+3. Tree Processing (PATCH)
+- Processes root blocks first (depth 0)
+- Recursively processes children
+- Maintains parent-child relationships
+- Tracks order among siblings
+- Sets is_terminal flag for leaf nodes
+
+4. Tree Reconstruction (GET)
+- Fetches flat list of connections with questions
+- Recursively builds nested structure
+- Matches parent-child relationships
+- Preserves order_index for siblings
+
+5. Auto-Create Questions
+- Searches for existing question by type + text
+- If not found, creates new question
+- Links question to flow_connection
+
+SECURITY
+- Verifies form ownership before GET/PATCH
+- Returns 404 if:
+  - Form doesn't exist
+  - User doesn't own form
+  - Form is soft deleted
+
+RULES
+- One flow per form (1:1 relationship)
+- Empty flow = no flow_connections rows
+- PATCH replaces entire flow (not incremental)
+- Questions are reusable (shared via question_id)
+- Frontend IDs (timestamps) mapped to DB UUIDs
+
+MIGRATIONS
+- Raw SQL only
+- Files:
+  migrations/004_create_flow_connections.up.sql
+  migrations/004_create_flow_connections.down.sql
+
+INTEGRATION
+- Forms module: Provides form_id
+- Questions module: Provides question_id
+- Flow module: Links them in tree structure
+
+FRONTEND WORKFLOW
+1. User creates form → Gets form_id
+2. User builds flow in UI → Sends PATCH with blocks
+3. Backend returns ID mapping
+4. Frontend updates local state with DB UUIDs
+5. Subsequent patches use real UUIDs
+
+FUTURE EXTENSIONS (NOT IMPLEMENTED)
+- Graph structure (non-tree flows)
+- Conditional branching logic
+- Flow versioning
+- Flow templates
+- A/B testing flows
+- Flow analytics (conversion funnels)
+- Jump logic (skip to block X)
+- Loop logic (repeat sections)
+
+STATUS
+Flows module is complete and working.
+Form-flow integration is secure and tested.

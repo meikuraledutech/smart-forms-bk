@@ -26,6 +26,11 @@ Responses:
 - 201: user registered successfully
 - 409: user already registered
 
+Example:
+curl -X POST http://localhost:3030/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
+
 2. Login
 POST /auth/login
 Body:
@@ -36,9 +41,14 @@ Body:
 
 Response:
 {
-  "access_token": "...",
-  "refresh_token": "..."
+  "access_token": "eyJhbGc...",
+  "refresh_token": "eyJhbGc..."
 }
+
+Example:
+curl -X POST http://localhost:3030/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
 
 3. Refresh Access Token
 POST /auth/refresh
@@ -51,6 +61,11 @@ Response:
 {
   "access_token": "..."
 }
+
+Example:
+curl -X POST http://localhost:3030/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token":"eyJhbGc..."}'
 
 TOKEN STRATEGY
 - Access token: short-lived

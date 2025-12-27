@@ -1,0 +1,170 @@
+QUESTIONS MODULE – README
+
+This module implements a reusable question library system
+using Go (Fiber), PostgreSQL, and raw SQL.
+
+FEATURES
+- Create questions and options
+- List questions (with type filter + pagination)
+- Get question by ID
+- Update questions
+- Soft delete questions
+- Auto-created by flow module
+- User-scoped creation
+- Raw SQL only
+- No ORM
+- JSONB for validation rules and metadata
+
+QUESTION MODEL
+- id (uuid)
+- type (question | option)
+- question_text
+- input_type (text, number, select, date, etc.)
+- validation_rules (jsonb)
+- metadata (jsonb)
+- created_by (user_id)
+- created_at
+- updated_at
+- deleted_at (soft delete)
+
+QUESTION ENDPOINTS
+
+1. Create Question
+POST /questions
+Headers:
+Authorization: Bearer <access_token>
+
+Body:
+{
+  "type": "question",
+  "question_text": "What is your department?",
+  "input_type": "select",
+  "validation_rules": {"required": true},
+  "metadata": {"category": "personal"}
+}
+
+Response:
+- 201: question created
+
+Example:
+TOKEN="your_access_token"
+curl -X POST http://localhost:3030/questions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "type": "question",
+    "question_text": "What is your department?",
+    "input_type": "select",
+    "validation_rules": {"required": true},
+    "metadata": {"category": "personal"}
+  }'
+
+2. List Questions
+GET /questions
+Headers:
+Authorization: Bearer <access_token>
+
+Query Params:
+- type (optional: question | option)
+- limit (default 10)
+- offset (default 0)
+
+Response:
+{
+  "items": [...],
+  "total": 50,
+  "limit": 10,
+  "offset": 0
+}
+
+Example:
+TOKEN="your_access_token"
+curl -X GET "http://localhost:3030/questions?type=question&limit=10&offset=0" \
+  -H "Authorization: Bearer $TOKEN"
+
+3. Get Question by ID
+GET /questions/:id
+Headers:
+Authorization: Bearer <access_token>
+
+Response:
+- 200: question data
+- 404: not found
+
+Example:
+TOKEN="your_access_token"
+QUESTION_ID="question-uuid-here"
+curl -X GET "http://localhost:3030/questions/$QUESTION_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
+4. Update Question
+PATCH /questions/:id
+Headers:
+Authorization: Bearer <access_token>
+
+Body:
+{
+  "type": "question",
+  "question_text": "Updated text",
+  "input_type": "text",
+  "validation_rules": {},
+  "metadata": {}
+}
+
+Response:
+- 204: updated
+
+Example:
+TOKEN="your_access_token"
+QUESTION_ID="question-uuid-here"
+curl -X PATCH "http://localhost:3030/questions/$QUESTION_ID" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "type": "question",
+    "question_text": "Updated text",
+    "input_type": "text",
+    "validation_rules": {},
+    "metadata": {}
+  }'
+
+5. Soft Delete Question
+DELETE /questions/:id
+Headers:
+Authorization: Bearer <access_token>
+
+Response:
+- 204: deleted
+
+Example:
+TOKEN="your_access_token"
+QUESTION_ID="question-uuid-here"
+curl -X DELETE "http://localhost:3030/questions/$QUESTION_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
+RULES
+- Questions are reusable across forms
+- Two types: 'question' and 'option'
+- Soft delete excludes from all queries
+- Questions can be auto-created by flow module
+- Validation rules stored as JSONB for flexibility
+
+MIGRATIONS
+- Raw SQL only
+- Files:
+  migrations/003_create_questions.up.sql
+  migrations/003_create_questions.down.sql
+
+USAGE PATTERN
+1. Manual: Create questions via API → Use in flows
+2. Auto: Flow module auto-creates questions from blocks
+
+FUTURE EXTENSIONS (NOT IMPLEMENTED)
+- Question templates
+- Question categories/tags
+- Question versioning
+- AI-generated questions
+- Question usage analytics
+
+STATUS
+Questions module is complete and working.

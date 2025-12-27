@@ -33,17 +33,15 @@ func (h *FlowHandler) UpdateFlow(c *fiber.Ctx) error {
 }
 
 func (h *FlowHandler) GetFlow(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
 	formID := c.Params("form_id")
 
-	connections, err := h.service.GetFlow(c.Context(), formID)
+	tree, err := h.service.GetFlowTree(c.Context(), userID, formID)
 	if err != nil {
-		return fiber.ErrInternalServerError
+		return mapServiceError(err)
 	}
 
-	return c.JSON(fiber.Map{
-		"connections": connections,
-		"total":       len(connections),
-	})
+	return c.JSON(tree)
 }
 
 func mapServiceError(err error) error {

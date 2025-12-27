@@ -58,6 +58,46 @@ func (r *FlowRepository) GetByFormID(ctx context.Context, formID string) ([]Flow
 	return connections, nil
 }
 
+func (r *FlowRepository) GetFlowWithQuestions(ctx context.Context, formID string) ([]map[string]interface{}, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			fc.id,
+			fc.parent_id,
+			fc.order_index,
+			q.type,
+			q.question_text
+		FROM flow_connections fc
+		JOIN questions q ON fc.question_id = q.id
+		WHERE fc.form_id = $1 AND fc.deleted_at IS NULL
+		ORDER BY fc.depth_level, fc.order_index
+	`, formID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []map[string]interface{}
+	for rows.Next() {
+		var id, qType, questionText string
+		var parentID *string
+		var orderIndex int
+
+		err := rows.Scan(&id, &parentID, &orderIndex, &qType, &questionText)
+		if err != nil {
+			continue
+		}
+
+		items = append(items, map[string]interface{}{
+			"id":           id,
+			"parent_id":    parentID,
+			"type":         qType,
+			"question":     questionText,
+			"order_index":  orderIndex,
+		})
+	}
+	return items, nil
+}
+
 func (r *FlowRepository) CreateQuestion(ctx context.Context, userID, qType, text string) (string, error) {
 	var id string
 	err := r.db.QueryRow(ctx, `
@@ -74,4 +114,24 @@ func (r *FlowRepository) FindQuestionByText(ctx context.Context, qType, text str
 		SELECT id FROM questions WHERE type = $1 AND question_text = $2 AND deleted_at IS NULL LIMIT 1
 	`, qType, text).Scan(&id)
 	return id, err
+}
+
+func (r *FlowRepository) VerifyFormOwnership(ctx context.Context, formID, userID string) error {
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM forms
+			WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+		)
+	`, formID, userID).Scan(&exists)
+
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		return ErrFormNotFound
+	}
+
+	return nil
 }

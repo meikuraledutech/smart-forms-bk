@@ -10,6 +10,7 @@ FEATURES
 - Update form (PATCH)
 - Soft delete forms
 - User-scoped access (JWT)
+- Flow integration (dynamic question trees)
 - Raw SQL only
 - No ORM
 - UTC-based timestamps
@@ -40,6 +41,16 @@ Body:
 Response:
 - 201: form created
 
+Example:
+TOKEN="your_access_token"
+curl -X POST http://localhost:3030/forms \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "title": "Student Feedback",
+    "description": "Feedback form"
+  }'
+
 2. List Forms
 GET /forms
 Headers:
@@ -58,6 +69,11 @@ Response:
   "offset": 0
 }
 
+Example:
+TOKEN="your_access_token"
+curl -X GET "http://localhost:3030/forms?limit=10&offset=0&search=feedback" \
+  -H "Authorization: Bearer $TOKEN"
+
 3. Get Form by ID
 GET /forms/:id
 Headers:
@@ -66,6 +82,12 @@ Authorization: Bearer <access_token>
 Response:
 - 200: form data
 - 404: not found
+
+Example:
+TOKEN="your_access_token"
+FORM_ID="form-uuid-here"
+curl -X GET "http://localhost:3030/forms/$FORM_ID" \
+  -H "Authorization: Bearer $TOKEN"
 
 4. Update Form
 PATCH /forms/:id
@@ -82,6 +104,18 @@ Body:
 Response:
 - 204: updated
 
+Example:
+TOKEN="your_access_token"
+FORM_ID="form-uuid-here"
+curl -X PATCH "http://localhost:3030/forms/$FORM_ID" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "title": "Updated title",
+    "description": "Updated description",
+    "status": "published"
+  }'
+
 5. Soft Delete Form
 PATCH /forms/:id/delete
 Headers:
@@ -90,11 +124,27 @@ Authorization: Bearer <access_token>
 Response:
 - 204: deleted
 
+Example:
+TOKEN="your_access_token"
+FORM_ID="form-uuid-here"
+curl -X PATCH "http://localhost:3030/forms/$FORM_ID/delete" \
+  -H "Authorization: Bearer $TOKEN"
+
+FLOW INTEGRATION
+Forms connect to dynamic question flows.
+
+Flow Endpoints:
+- PATCH /forms/:form_id/flow - Create/update flow
+- GET /forms/:form_id/flow - Get flow structure
+
+See flows.txt for complete flow documentation.
+
 RULES
 - Forms are user-owned
 - Deleted forms are excluded from all queries
 - Only PATCH, POST, GET (no PUT/DELETE)
 - List ordered by updated_at DESC
+- Each form can have one flow (1:1 relationship)
 
 MIGRATIONS
 - Raw SQL only
@@ -102,12 +152,19 @@ MIGRATIONS
   migrations/002_create_forms.up.sql
   migrations/002_create_forms.down.sql
 
+IMPLEMENTED INTEGRATIONS
+- Flow module (dynamic question trees)
+- Questions module (auto-created from flows)
+
 FUTURE EXTENSIONS (NOT IMPLEMENTED)
-- Form fields
-- Form responses
+- Form responses/submissions
 - Sharing/public forms
 - Role-based access
-- Analytics
+- Analytics dashboard
+- Form templates
+- Duplicate forms
 
 STATUS
 Forms core is complete and working.
+Flow integration is complete and tested.
+Ready for submissions module.

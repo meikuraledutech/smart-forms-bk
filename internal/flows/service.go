@@ -18,6 +18,11 @@ func (s *FlowService) UpdateFlow(ctx context.Context, userID, formID string, req
 		return nil, ErrInvalidInput
 	}
 
+	// Verify user owns the form
+	if err := s.repo.VerifyFormOwnership(ctx, formID, userID); err != nil {
+		return nil, err
+	}
+
 	// Soft delete existing flow
 	if err := s.repo.DeleteByFormID(ctx, formID); err != nil {
 		return nil, err
@@ -75,6 +80,55 @@ func (s *FlowService) processBlock(ctx context.Context, userID, formID string, b
 	return nil
 }
 
-func (s *FlowService) GetFlow(ctx context.Context, formID string) ([]FlowConnection, error) {
+func (s *FlowService) GetFlow(ctx context.Context, userID, formID string) ([]FlowConnection, error) {
+	// Verify user owns the form
+	if err := s.repo.VerifyFormOwnership(ctx, formID, userID); err != nil {
+		return nil, err
+	}
+
 	return s.repo.GetByFormID(ctx, formID)
+}
+
+func (s *FlowService) GetFlowTree(ctx context.Context, userID, formID string) (map[string]interface{}, error) {
+	// Verify user owns the form
+	if err := s.repo.VerifyFormOwnership(ctx, formID, userID); err != nil {
+		return nil, err
+	}
+
+	items, err := s.repo.GetFlowWithQuestions(ctx, formID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build tree structure
+	blocks := s.buildTree(items, nil)
+
+	return map[string]interface{}{
+		"blocks": blocks,
+	}, nil
+}
+
+func (s *FlowService) buildTree(items []map[string]interface{}, parentID *string) []map[string]interface{} {
+	var result []map[string]interface{}
+
+	for _, item := range items {
+		itemParentID := item["parent_id"].(*string)
+
+		// Check if this item belongs to current parent
+		if (parentID == nil && itemParentID == nil) ||
+		   (parentID != nil && itemParentID != nil && *parentID == *itemParentID) {
+
+			id := item["id"].(string)
+			block := map[string]interface{}{
+				"id":       id,
+				"type":     item["type"],
+				"question": item["question"],
+				"children": s.buildTree(items, &id),
+			}
+
+			result = append(result, block)
+		}
+	}
+
+	return result
 }

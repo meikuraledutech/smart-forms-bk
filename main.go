@@ -9,6 +9,7 @@ import (
 	"smart-forms/internal/auth"
 	"smart-forms/internal/flows"
 	"smart-forms/internal/forms"
+	"smart-forms/internal/links"
 	"smart-forms/internal/questions"
 
 	"github.com/gofiber/fiber/v2"
@@ -74,6 +75,13 @@ func main() {
 	flowService := flows.NewFlowService(flowRepo)
 	flowHandler := flows.NewFlowHandler(flowService)
 
+	linksRepo := links.NewLinksRepository(db)
+	linksService := links.NewLinksService(linksRepo)
+	linksHandler := links.NewLinksHandler(linksService)
+
+	// Public routes (no auth) - MUST be before protected group
+	app.Get("/f/:slug", linksHandler.GetPublicForm)
+
 	// Protect routes
 	api := app.Group("/", auth.JWTAuthMiddleware())
 
@@ -94,6 +102,10 @@ func main() {
 	// Flow routes
 	api.Patch("/forms/:form_id/flow", flowHandler.UpdateFlow)
 	api.Get("/forms/:form_id/flow", flowHandler.GetFlow)
+
+	// Links routes (protected)
+	api.Patch("/forms/:form_id/publish", linksHandler.PublishForm)
+	api.Patch("/forms/:form_id/accepting-responses", linksHandler.ToggleAcceptingResponses)
 
 	port := os.Getenv("PORT")
 	if port == "" {

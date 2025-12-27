@@ -21,6 +21,10 @@ FORM MODEL
 - title
 - description
 - status (draft | published)
+- auto_slug (unique, generated on publish)
+- custom_slug (unique, optional custom URL)
+- accepting_responses (boolean, controls submissions)
+- published_at (timestamp, when published)
 - created_at (UTC)
 - updated_at (UTC)
 - deleted_at (soft delete)
@@ -151,20 +155,32 @@ MIGRATIONS
 - Files:
   migrations/002_create_forms.up.sql
   migrations/002_create_forms.down.sql
+  migrations/005_add_publish_fields_to_forms.up.sql
+  migrations/005_add_publish_fields_to_forms.down.sql
 
 IMPLEMENTED INTEGRATIONS
 - Flow module (dynamic question trees)
 - Questions module (auto-created from flows)
+- Links module (form publishing, public URLs)
+
+PUBLISH INTEGRATION
+- Forms can be published to generate public URLs
+- See docs/links.txt for publishing details
+- auto_slug generated automatically (11 chars)
+- custom_slug optional (user-defined, 3-50 chars)
+- accepting_responses controls if form accepts submissions
+- Both slugs work: /f/auto_slug or /f/custom_slug
 
 FUTURE EXTENSIONS (NOT IMPLEMENTED)
 - Form responses/submissions
-- Sharing/public forms
 - Role-based access
 - Analytics dashboard
 - Form templates
 - Duplicate forms
+- Form versioning
 
 STATUS
 Forms core is complete and working.
 Flow integration is complete and tested.
-Ready for submissions module.
+Links/publishing module is complete and tested.
+Ready for responses/submissions module.

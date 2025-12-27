@@ -70,7 +70,7 @@ func (r *FormsRepository) GetByID(
 ) (*Form, error) {
 
 	const query = `
-		SELECT id, title, description, status, created_at, updated_at
+		SELECT id, title, description, status, auto_slug, custom_slug, accepting_responses, published_at, created_at, updated_at
 		FROM forms
 		WHERE
 			id = $1
@@ -89,6 +89,10 @@ func (r *FormsRepository) GetByID(
 		&f.Title,
 		&f.Description,
 		&f.Status,
+		&f.AutoSlug,
+		&f.CustomSlug,
+		&f.AcceptingResponses,
+		&f.PublishedAt,
 		&f.CreatedAt,
 		&f.UpdatedAt,
 	)
@@ -130,7 +134,7 @@ func (r *FormsRepository) List(
 	if search == "" {
 		// -------- NO SEARCH --------
 		listQuery := `
-			SELECT id, title, description, status, created_at, updated_at
+			SELECT id, title, description, status, auto_slug, custom_slug, accepting_responses, published_at, created_at, updated_at
 			FROM forms
 			WHERE user_id = $1
 			  AND deleted_at IS NULL
@@ -159,7 +163,7 @@ func (r *FormsRepository) List(
 	} else {
 		// -------- WITH SEARCH --------
 		listQuery := `
-			SELECT id, title, description, status, created_at, updated_at
+			SELECT id, title, description, status, auto_slug, custom_slug, accepting_responses, published_at, created_at, updated_at
 			FROM forms
 			WHERE user_id = $1
 			  AND deleted_at IS NULL
@@ -195,6 +199,10 @@ func (r *FormsRepository) List(
 			&f.Title,
 			&f.Description,
 			&f.Status,
+			&f.AutoSlug,
+			&f.CustomSlug,
+			&f.AcceptingResponses,
+			&f.PublishedAt,
 			&f.CreatedAt,
 			&f.UpdatedAt,
 		); err != nil {

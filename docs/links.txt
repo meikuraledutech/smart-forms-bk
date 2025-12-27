@@ -1,0 +1,213 @@
+LINKS MODULE – README
+
+This module implements form publishing and public link generation
+using Go (Fiber), PostgreSQL, and raw SQL.
+
+FEATURES
+- Publish forms with auto-generated slug
+- Optional custom slug (future paid feature)
+- Toggle accepting responses on/off
+- Public form access via slug
+- Slug uniqueness validation
+- User-scoped form ownership
+- Raw SQL only
+- No ORM
+
+PUBLISH FIELDS (added to forms table)
+- auto_slug (VARCHAR(100) UNIQUE) - Auto-generated
+- custom_slug (VARCHAR(100) UNIQUE) - Optional custom URL
+- accepting_responses (BOOLEAN) - Whether form accepts submissions
+- published_at (TIMESTAMP) - When form was published
+
+LINK ENDPOINTS
+
+1. Publish Form
+PATCH /forms/:form_id/publish
+Headers:
+Authorization: Bearer <access_token>
+
+Body (optional custom slug):
+{
+  "custom_slug": "employee-survey"
+}
+
+Response:
+{
+  "message": "Form published successfully",
+  "links": {
+    "auto_slug": "Xy7kL9mPq1A",
+    "auto_url": "/f/Xy7kL9mPq1A",
+    "custom_slug": "employee-survey",
+    "custom_url": "/f/employee-survey"
+  }
+}
+
+Example:
+TOKEN="your_access_token"
+FORM_ID="form-uuid-here"
+curl -X PATCH "http://localhost:3030/forms/$FORM_ID/publish" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"custom_slug":"my-survey"}'
+
+2. Toggle Accepting Responses
+PATCH /forms/:form_id/accepting-responses
+Headers:
+Authorization: Bearer <access_token>
+
+Body:
+{
+  "accepting": true
+}
+
+Response:
+{
+  "message": "Updated successfully",
+  "accepting_responses": true
+}
+
+Example:
+TOKEN="your_access_token"
+FORM_ID="form-uuid-here"
+curl -X PATCH "http://localhost:3030/forms/$FORM_ID/accepting-responses" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"accepting":false}'
+
+3. Get Public Form (No Auth Required)
+GET /f/:slug
+Headers: None
+
+Response:
+{
+  "id": "form-uuid",
+  "title": "Employee Survey",
+  "description": "Annual employee feedback",
+  "accepting_responses": true,
+  "flow": {
+    "blocks": [
+      {
+        "id": "uuid-1",
+        "type": "question",
+        "question": "How satisfied are you?",
+        "children": [
+          {
+            "id": "uuid-2",
+            "type": "option",
+            "question": "Very Satisfied",
+            "children": null
+          },
+          {
+            "id": "uuid-3",
+            "type": "option",
+            "question": "Satisfied",
+            "children": null
+          }
+        ]
+      }
+    ]
+  }
+}
+
+Note: Works with both auto_slug and custom_slug
+
+Example (auto slug):
+curl -X GET "http://localhost:3030/f/ob7JDWKrF9s"
+
+Example (custom slug):
+curl -X GET "http://localhost:3030/f/employee-survey"
+
+PUBLISH LOGIC
+
+1. Auto Slug Generation
+- Generates random 11-character slug
+- Base64 URL-safe encoding
+- Unique across all forms
+
+2. Custom Slug Validation
+- 3-50 characters
+- Lowercase letters, numbers, hyphens only
+- Must be unique
+- Optional (can publish without custom slug)
+
+3. Publishing Process
+- Sets status = 'published'
+- Generates auto_slug
+- Sets custom_slug if provided
+- Sets accepting_responses = true
+- Sets published_at = NOW()
+
+4. Toggle Accepting Responses
+- Owner can turn on/off at any time
+- Prevents new submissions when false
+- Existing responses unaffected
+
+SECURITY
+- Publish requires form ownership
+- Toggle requires form ownership
+- Public form access: no auth required
+- Slug checked before publishing
+
+RULES
+- Auto slug generated only once (never regenerated)
+- Custom slug can be set during publish
+- Both auto and custom slugs work for public access
+- Form must be published to be publicly accessible
+- Unpublishing: set status back to 'draft' via forms API
+
+CUSTOM SLUG RULES
+- Format: ^[a-z0-9-]+$
+- Length: 3-50 characters
+- Must be unique across all forms
+- Returns 409 Conflict if taken
+- Returns 400 Bad Request if invalid format
+
+MIGRATIONS
+- Raw SQL only
+- Files:
+  migrations/005_add_publish_fields_to_forms.up.sql
+  migrations/005_add_publish_fields_to_forms.down.sql
+
+INTEGRATION
+- Forms module: Provides form data
+- Flows module: Provides flow structure for public view
+- Links module: Handles publishing and public access
+
+WORKFLOW
+1. User creates form (draft status)
+2. User builds flow
+3. User publishes form → Gets auto_slug + optional custom_slug
+4. Share link: /f/{slug}
+5. Public users access form via slug
+6. Owner can toggle accepting_responses on/off
+
+FUTURE EXTENSIONS (NOT IMPLEMENTED)
+- Custom slug as paid feature (paywall)
+- Form analytics (views, completion rate)
+- Expiration dates for forms
+- Password-protected forms
+- Response limits
+- Form templates from published forms
+
+TESTING RESULTS
+All endpoints tested and verified:
+✅ Publish form with auto-slug generation
+✅ Publish form with custom slug
+✅ GET public form via auto_slug (no auth required)
+✅ GET public form via custom_slug (no auth required)
+✅ Toggle accepting_responses on/off
+✅ Slug validation (lowercase, numbers, hyphens only)
+✅ Duplicate slug detection (409 Conflict)
+✅ Invalid slug format rejection (400 Bad Request)
+
+IMPORTANT NOTES
+- Public route /f/:slug MUST be registered before protected routes group
+- Both auto_slug and custom_slug work for accessing published forms
+- Slug validation: ^[a-z0-9-]+$ (3-50 characters)
+- Auto-slug is 11 characters, base64 URL-safe encoded
+- Flow structure returned in nested tree format
+- Empty children returned as null (not empty array)
+
+STATUS
+Links module is complete and working.
+Form publishing with dual slugs fully tested and verified.

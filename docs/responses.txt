@@ -12,6 +12,7 @@ FEATURES
 - Form status verification (published, accepting)
 - Raw SQL only
 - No ORM
+- UTC-based timestamps
 
 RESPONSE TABLES
 
@@ -236,6 +237,7 @@ All endpoints tested and verified:
 
 IMPORTANT NOTES
 - submitted_at timestamp is server-side (don't send from client)
+- All timestamps stored in UTC (convert to local timezone on frontend)
 - flow_connection_id comes from GET /f/:slug response
 - answer_text is always required
 - answer_value is optional for structured data

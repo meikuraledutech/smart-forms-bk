@@ -10,6 +10,7 @@ FEATURES
 - Password hashing using bcrypt
 - Raw SQL migrations
 - No ORM
+- UTC-based timestamps
 - Future-ready for Redis, roles, pricing
 
 AUTH ENDPOINTS

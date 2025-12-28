@@ -12,6 +12,7 @@ FEATURES
 - User-scoped form ownership
 - Raw SQL only
 - No ORM
+- UTC-based timestamps
 
 PUBLISH FIELDS (added to forms table)
 - auto_slug (VARCHAR(100) UNIQUE) - Auto-generated

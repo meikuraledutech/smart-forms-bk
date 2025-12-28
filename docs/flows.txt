@@ -15,6 +15,7 @@ FEATURES
 - Raw SQL only
 - No ORM
 - Soft delete support
+- UTC-based timestamps
 
 FLOW CONNECTION MODEL
 - id (uuid)

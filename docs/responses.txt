@@ -1,0 +1,261 @@
+RESPONSES MODULE – README
+
+This module implements form response submission and retrieval
+using Go (Fiber), PostgreSQL, and raw SQL.
+
+FEATURES
+- Public form response submission (no auth)
+- Owner-only response retrieval
+- Flow path tracking
+- Time tracking per question
+- Answer validation
+- Form status verification (published, accepting)
+- Raw SQL only
+- No ORM
+
+RESPONSE TABLES
+
+form_responses:
+- id (uuid)
+- form_id (FK → forms.id)
+- submitted_at (timestamp)
+- total_time_spent (int, seconds)
+- flow_path (jsonb array of flow_connection_ids)
+- metadata (jsonb)
+- created_at
+
+response_answers:
+- id (uuid)
+- response_id (FK → form_responses.id)
+- flow_connection_id (FK → flow_connections.id)
+- answer_text (text, required)
+- answer_value (jsonb, optional structured data)
+- time_spent (int, seconds, optional)
+- created_at
+
+RESPONSE ENDPOINTS
+
+1. Submit Response (Public, No Auth)
+POST /f/:slug/responses
+Headers: None
+
+Body:
+{
+  "responses": [
+    {
+      "flow_connection_id": "uuid-from-flow",
+      "answer_text": "User's answer",
+      "answer_value": {"key": "value"},
+      "time_spent": 10
+    }
+  ],
+  "metadata": {
+    "total_time_spent": 185,
+    "flow_path": ["uuid-1", "uuid-2", "uuid-3"]
+  }
+}
+
+Response (201):
+{
+  "message": "Response submitted successfully",
+  "response_id": "generated-uuid"
+}
+
+Errors:
+- 400: Invalid input, invalid flow_connection_id
+- 403: Form not accepting responses
+- 404: Form not found
+
+Example:
+SLUG="employee-survey"
+curl -X POST "http://localhost:3030/f/$SLUG/responses" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "responses": [
+      {
+        "flow_connection_id": "uuid-here",
+        "answer_text": "Very Satisfied",
+        "time_spent": 5
+      }
+    ],
+    "metadata": {
+      "total_time_spent": 20,
+      "flow_path": ["uuid-1", "uuid-2"]
+    }
+  }'
+
+2. Get Form Responses (Protected, Owner Only)
+GET /forms/:form_id/responses
+Headers:
+Authorization: Bearer <access_token>
+
+Query Params:
+- limit (default 10, max 100)
+- offset (default 0)
+
+Response (200):
+{
+  "items": [
+    {
+      "id": "response-uuid",
+      "form_id": "form-uuid",
+      "submitted_at": "2025-01-15T10:32:45Z",
+      "total_time_spent": 185,
+      "flow_path": ["uuid-1", "uuid-2"],
+      "metadata": {}
+    }
+  ],
+  "total": 50,
+  "limit": 10,
+  "offset": 0
+}
+
+Example:
+TOKEN="your_access_token"
+FORM_ID="form-uuid"
+curl -X GET "http://localhost:3030/forms/$FORM_ID/responses?limit=10&offset=0" \
+  -H "Authorization: Bearer $TOKEN"
+
+VALIDATION RULES
+
+1. Form must be published (status = 'published')
+2. Form must be accepting responses (accepting_responses = true)
+3. responses array must not be empty
+4. Each response requires:
+   - flow_connection_id (valid UUID)
+   - answer_text (not empty)
+5. flow_connection_id must exist in form's flow
+6. metadata.total_time_spent >= 0
+7. metadata.flow_path must not be empty
+
+RESPONSE LOGIC
+
+1. Submit Response (Public)
+- Validates form is published & accepting
+- Verifies all flow_connection_ids exist in form's flow
+- Validates UUID format
+- Creates form_response record (server timestamp)
+- Creates response_answer records for each answer
+- Returns response_id
+
+2. Get Responses (Owner)
+- Requires authentication
+- Returns paginated list of responses
+- Includes flow_path and metadata
+- Ordered by submitted_at DESC
+
+ANSWER VALUE EXAMPLES
+
+Text input:
+{
+  "flow_connection_id": "uuid",
+  "answer_text": "John Doe",
+  "answer_value": null
+}
+
+Date input:
+{
+  "flow_connection_id": "uuid",
+  "answer_text": "2025-01-15",
+  "answer_value": {
+    "date": "2025-01-15",
+    "formatted": "January 15, 2025"
+  }
+}
+
+Multi-select:
+{
+  "flow_connection_id": "uuid",
+  "answer_text": "Option A, Option B",
+  "answer_value": {
+    "selected": ["option-a-id", "option-b-id"]
+  }
+}
+
+Rating:
+{
+  "flow_connection_id": "uuid",
+  "answer_text": "4 out of 5",
+  "answer_value": {
+    "rating": 4,
+    "max": 5
+  }
+}
+
+FLOW PATH TRACKING
+
+flow_path array contains ALL flow_connection_ids visited in order:
+- Question nodes
+- Option nodes
+- Input nodes
+- Follow-up questions
+
+Example path:
+1. "How satisfied?" (question)
+2. "Very Satisfied" (option)
+3. "What did you like?" (follow-up question)
+4. "Great service" (input answer)
+
+flow_path: ["q-uuid", "opt-uuid", "followup-uuid", "input-uuid"]
+
+SECURITY
+- Public submission: No auth required
+- Get responses: Owner only (JWT required)
+- Form ownership verified for GET endpoint
+- Returns 404 if form not published or doesn't exist
+
+MIGRATIONS
+- Raw SQL only
+- Files:
+  migrations/007_create_form_responses.up.sql
+  migrations/007_create_form_responses.down.sql
+
+INTEGRATION
+- Forms module: Provides form_id
+- Links module: Provides public slug
+- Flow module: Provides flow_connection_ids
+- Responses module: Stores submission data
+
+ANALYTICS READY
+- Time tracking (total & per question)
+- Flow path analysis
+- Response timestamps
+- Structured answer_value for complex data
+
+TESTING RESULTS
+All endpoints tested and verified:
+✅ Public response submission (no auth)
+✅ Owner-only response retrieval
+✅ Flow path tracking
+✅ Answer value storage (text + JSON)
+✅ Time tracking validation
+✅ Form status validation (published, accepting)
+✅ UUID format validation
+✅ Flow connection verification
+✅ Proper HTTP status codes (201, 200, 400, 403, 404)
+
+IMPORTANT NOTES
+- submitted_at timestamp is server-side (don't send from client)
+- flow_connection_id comes from GET /f/:slug response
+- answer_text is always required
+- answer_value is optional for structured data
+- Check accepting_responses before showing form
+- No rate limiting implemented (add if needed)
+
+FUTURE EXTENSIONS (NOT IMPLEMENTED)
+- Response analytics dashboard
+- Export responses (CSV, Excel)
+- Response filtering & search
+- Individual response details endpoint
+- Response editing (allow users to edit submissions)
+- Response deletion
+- Anonymous vs authenticated submissions
+- Spam detection
+- IP address tracking
+- Device/browser tracking
+- A/B testing support
+
+STATUS
+Responses module is complete and working.
+Public submission and owner retrieval fully tested.
+Ready for analytics and export features.

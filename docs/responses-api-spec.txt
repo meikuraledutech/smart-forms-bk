@@ -1,0 +1,242 @@
+FORM RESPONSES API - FRONTEND SPECIFICATION
+
+===========================================
+SUBMIT FORM RESPONSE
+===========================================
+
+Endpoint: POST /f/:slug/responses
+Auth: None (public endpoint)
+Content-Type: application/json
+
+REQUEST BODY
+{
+  "responses": [
+    {
+      "flow_connection_id": "uuid-from-flow-blocks",
+      "answer_text": "User's answer as text",
+      "answer_value": {
+        "key": "value for structured data (optional)"
+      },
+      "time_spent": 8
+    }
+  ],
+  "metadata": {
+    "total_time_spent": 185,
+    "flow_path": [
+      "uuid-1",
+      "uuid-2",
+      "uuid-3"
+    ]
+  }
+}
+
+FIELD DESCRIPTIONS
+
+responses (array, required):
+- Each object represents one answer
+- flow_connection_id: The "id" field from the flow block (GET /f/:slug returns this)
+- answer_text: User's answer as plain text (required)
+- answer_value: JSON object for complex answers like date ranges, multi-select, etc. (optional)
+- time_spent: Seconds spent on this question (optional, integer)
+
+metadata (object, required):
+- total_time_spent: Total seconds spent on entire form (required, integer)
+- flow_path: Array of flow_connection_ids showing the path taken through the form (required)
+
+RESPONSE (Success)
+Status: 201 Created
+{
+  "message": "Response submitted successfully",
+  "response_id": "generated-uuid"
+}
+
+RESPONSE (Errors)
+Status: 400 Bad Request
+{
+  "error": "Invalid input"
+}
+
+Status: 404 Not Found
+{
+  "error": "Form not found"
+}
+
+Status: 403 Forbidden
+{
+  "error": "Form is not accepting responses"
+}
+
+===========================================
+VALIDATION RULES
+===========================================
+
+1. Form must be published (status = "published")
+2. Form must be accepting responses (accepting_responses = true)
+3. responses array must not be empty
+4. Each response must have flow_connection_id and answer_text
+5. flow_connection_id must exist in the form's flow structure
+6. metadata.total_time_spent must be positive integer
+7. metadata.flow_path must be array of valid flow_connection_ids
+
+===========================================
+EXAMPLE USAGE
+===========================================
+
+Scenario: User fills out a simple satisfaction survey
+
+Step 1: GET /f/employee-survey
+Returns:
+{
+  "id": "form-uuid",
+  "title": "Employee Survey",
+  "accepting_responses": true,
+  "flow": {
+    "blocks": [
+      {
+        "id": "fc-uuid-1",
+        "type": "question",
+        "question": "How satisfied are you?",
+        "children": [
+          {
+            "id": "fc-uuid-2",
+            "type": "option",
+            "question": "Very Satisfied",
+            "children": []
+          },
+          {
+            "id": "fc-uuid-3",
+            "type": "option",
+            "question": "Satisfied",
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}
+
+Step 2: User selects "Satisfied" option
+
+Step 3: POST /f/employee-survey/responses
+{
+  "responses": [
+    {
+      "flow_connection_id": "fc-uuid-1",
+      "answer_text": "How satisfied are you?",
+      "time_spent": 5
+    },
+    {
+      "flow_connection_id": "fc-uuid-3",
+      "answer_text": "Satisfied",
+      "time_spent": 10
+    }
+  ],
+  "metadata": {
+    "total_time_spent": 15,
+    "flow_path": ["fc-uuid-1", "fc-uuid-3"]
+  }
+}
+
+Returns:
+{
+  "message": "Response submitted successfully",
+  "response_id": "response-uuid"
+}
+
+===========================================
+NOTES FOR FRONTEND
+===========================================
+
+1. flow_connection_id: Use the "id" from the flow blocks, NOT the question_id
+2. answer_text: Always send the user's answer as text (even for options)
+3. answer_value: Use for complex data (dates, arrays, objects) - optional
+4. time_spent: Track time in seconds, optional but recommended for analytics
+5. flow_path: Array of ALL flow_connection_ids visited, in order
+6. submitted_at: DO NOT send - server will timestamp automatically
+7. Form slug: Use the slug from the publish response (auto_slug or custom_slug)
+8. Check accepting_responses before showing form to user
+
+===========================================
+ANSWER VALUE EXAMPLES
+===========================================
+
+Text input:
+{
+  "flow_connection_id": "uuid",
+  "answer_text": "John Doe",
+  "answer_value": null
+}
+
+Date input:
+{
+  "flow_connection_id": "uuid",
+  "answer_text": "2025-01-15",
+  "answer_value": {
+    "date": "2025-01-15",
+    "formatted": "January 15, 2025"
+  }
+}
+
+Multi-select:
+{
+  "flow_connection_id": "uuid",
+  "answer_text": "Option A, Option B",
+  "answer_value": {
+    "selected": ["option-a-id", "option-b-id"]
+  }
+}
+
+Rating:
+{
+  "flow_connection_id": "uuid",
+  "answer_text": "4 out of 5",
+  "answer_value": {
+    "rating": 4,
+    "max": 5
+  }
+}
+
+===========================================
+FLOW PATH TRACKING
+===========================================
+
+The flow_path array should contain ALL flow_connection_ids the user visited:
+
+Example: User flow
+1. Sees question "Department?" (fc-uuid-1)
+2. Selects "Engineering" (fc-uuid-2)
+3. Sees follow-up "Role?" (fc-uuid-3)
+4. Enters "Senior Developer" (fc-uuid-4)
+
+flow_path: ["fc-uuid-1", "fc-uuid-2", "fc-uuid-3", "fc-uuid-4"]
+
+This helps us understand:
+- Which path users took through conditional flows
+- Where users spend most time
+- Drop-off points in the form
+
+===========================================
+TESTING
+===========================================
+
+Use these curl commands to test:
+
+# Get form
+curl http://localhost:3030/f/your-slug
+
+# Submit response
+curl -X POST http://localhost:3030/f/your-slug/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "responses": [
+      {
+        "flow_connection_id": "uuid-here",
+        "answer_text": "Test answer",
+        "time_spent": 5
+      }
+    ],
+    "metadata": {
+      "total_time_spent": 10,
+      "flow_path": ["uuid-here"]
+    }
+  }'

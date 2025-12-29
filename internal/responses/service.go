@@ -93,7 +93,17 @@ func (s *ResponsesService) GetResponses(ctx context.Context, formID string, limi
 
 // GetResponseDetails retrieves a single response with all answers
 func (s *ResponsesService) GetResponseDetails(ctx context.Context, responseID string) (*FormResponse, []ResponseAnswer, error) {
-	// This would need a repo method to get single response
-	// For now, returning error as placeholder
-	return nil, nil, ErrInvalidInput
+	// Get response
+	response, err := s.repo.GetResponseByID(ctx, responseID)
+	if err != nil {
+		return nil, nil, ErrFormNotFound
+	}
+
+	// Get all answers for the response
+	answers, err := s.repo.GetAnswersByResponseID(ctx, responseID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return response, answers, nil
 }

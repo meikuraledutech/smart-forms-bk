@@ -117,6 +117,46 @@ FORM_ID="form-uuid"
 curl -X GET "http://localhost:3030/forms/$FORM_ID/responses?limit=10&offset=0" \
   -H "Authorization: Bearer $TOKEN"
 
+3. Get Individual Response Details (Protected)
+GET /responses/:response_id
+Headers:
+Authorization: Bearer <access_token>
+
+Response (200):
+{
+  "response": {
+    "id": "response-uuid",
+    "form_id": "form-uuid",
+    "submitted_at": "2025-01-15T10:32:45Z",
+    "total_time_spent": 185,
+    "flow_path": ["uuid-1", "uuid-2"],
+    "metadata": {}
+  },
+  "answers": [
+    {
+      "id": "answer-uuid",
+      "response_id": "response-uuid",
+      "flow_connection_id": "uuid-1",
+      "answer_text": "User's answer text",
+      "answer_value": {"key": "value"},
+      "time_spent": 10
+    },
+    {
+      "id": "answer-uuid-2",
+      "response_id": "response-uuid",
+      "flow_connection_id": "uuid-2",
+      "answer_text": "Another answer",
+      "time_spent": 8
+    }
+  ]
+}
+
+Example:
+TOKEN="your_access_token"
+RESPONSE_ID="response-uuid"
+curl -X GET "http://localhost:3030/responses/$RESPONSE_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
 VALIDATION RULES
 
 1. Form must be published (status = 'published')
@@ -201,9 +241,10 @@ flow_path: ["q-uuid", "opt-uuid", "followup-uuid", "input-uuid"]
 
 SECURITY
 - Public submission: No auth required
-- Get responses: Owner only (JWT required)
-- Form ownership verified for GET endpoint
-- Returns 404 if form not published or doesn't exist
+- Get responses list: Protected (JWT required)
+- Get individual response: Protected (JWT required)
+- Returns 404 if response not found
+- Returns 403 if form not accepting responses (submission only)
 
 MIGRATIONS
 - Raw SQL only
@@ -226,7 +267,8 @@ ANALYTICS READY
 TESTING RESULTS
 All endpoints tested and verified:
 ✅ Public response submission (no auth)
-✅ Owner-only response retrieval
+✅ Owner-only response list retrieval (paginated)
+✅ Individual response details with answers
 ✅ Flow path tracking
 ✅ Answer value storage (text + JSON)
 ✅ Time tracking validation
@@ -248,7 +290,6 @@ FUTURE EXTENSIONS (NOT IMPLEMENTED)
 - Response analytics dashboard
 - Export responses (CSV, Excel)
 - Response filtering & search
-- Individual response details endpoint
 - Response editing (allow users to edit submissions)
 - Response deletion
 - Anonymous vs authenticated submissions
@@ -256,8 +297,9 @@ FUTURE EXTENSIONS (NOT IMPLEMENTED)
 - IP address tracking
 - Device/browser tracking
 - A/B testing support
+- Form ownership verification for response access
 
 STATUS
 Responses module is complete and working.
-Public submission and owner retrieval fully tested.
+Public submission, list retrieval, and individual response details fully tested.
 Ready for analytics and export features.

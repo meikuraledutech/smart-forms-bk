@@ -115,6 +115,7 @@ func main() {
 
 	// Responses routes (protected)
 	api.Get("/forms/:form_id/responses", responsesHandler.GetFormResponses)
+	api.Get("/responses/:response_id", responsesHandler.GetResponseDetails)
 
 	port := os.Getenv("PORT")
 	if port == "" {

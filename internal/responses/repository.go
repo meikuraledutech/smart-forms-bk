@@ -121,6 +121,27 @@ func (r *ResponsesRepository) GetResponsesByFormID(ctx context.Context, formID s
 	return responses, total, nil
 }
 
+// GetResponseByID retrieves a single response by ID
+func (r *ResponsesRepository) GetResponseByID(ctx context.Context, responseID string) (*FormResponse, error) {
+	var resp FormResponse
+	var flowPathJSON, metadataJSON []byte
+
+	err := r.db.QueryRow(ctx, `
+		SELECT id, form_id, submitted_at, total_time_spent, flow_path, metadata
+		FROM form_responses
+		WHERE id = $1
+	`, responseID).Scan(&resp.ID, &resp.FormID, &resp.SubmittedAt, &resp.TotalTimeSpent, &flowPathJSON, &metadataJSON)
+
+	if err != nil {
+		return nil, err
+	}
+
+	json.Unmarshal(flowPathJSON, &resp.FlowPath)
+	json.Unmarshal(metadataJSON, &resp.Metadata)
+
+	return &resp, nil
+}
+
 // GetAnswersByResponseID retrieves all answers for a response
 func (r *ResponsesRepository) GetAnswersByResponseID(ctx context.Context, responseID string) ([]ResponseAnswer, error) {
 	rows, err := r.db.Query(ctx, `

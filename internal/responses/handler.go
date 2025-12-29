@@ -55,6 +55,22 @@ func (h *ResponsesHandler) GetFormResponses(c *fiber.Ctx) error {
 	})
 }
 
+// GetResponseDetails retrieves a single response with all answers (protected endpoint)
+// GET /responses/:response_id
+func (h *ResponsesHandler) GetResponseDetails(c *fiber.Ctx) error {
+	responseID := c.Params("response_id")
+
+	response, answers, err := h.service.GetResponseDetails(c.Context(), responseID)
+	if err != nil {
+		return mapServiceError(err)
+	}
+
+	return c.JSON(fiber.Map{
+		"response": response,
+		"answers":  answers,
+	})
+}
+
 func mapServiceError(err error) error {
 	switch err {
 	case ErrFormNotFound:

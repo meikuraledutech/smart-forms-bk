@@ -1,0 +1,319 @@
+ANALYTICS MODULE – README
+
+This module implements form analytics with node-level metrics
+using Go (Fiber), PostgreSQL, and raw SQL.
+
+FEATURES
+- Node-level analytics (visit count, answer rate, drop-offs)
+- On-demand calculation with caching
+- Status polling for async operations
+- Pain point detection (high time, skip rate, drop-offs)
+- Raw SQL only
+- No ORM
+- UTC-based timestamps
+
+ANALYTICS TABLES
+
+analytics_status:
+- form_id (PK, FK → forms.id)
+- status (pending, calculating, completed, failed)
+- calculated_at (timestamp)
+- triggered_by (FK → users.id)
+- created_at
+- updated_at
+
+analytics_nodes:
+- id (uuid)
+- form_id (FK → forms.id)
+- flow_connection_id (FK → flow_connections.id)
+- visit_count (int)
+- answer_count (int)
+- skip_count (int)
+- drop_off_count (int)
+- total_time_spent (int, seconds)
+- avg_time_spent (float, seconds)
+- calculated_at (timestamp)
+- UNIQUE(form_id, flow_connection_id)
+
+analytics_paths:
+- id (uuid)
+- form_id (FK → forms.id)
+- path (jsonb array)
+- occurrence_count (int)
+- avg_completion_time (float)
+- completion_rate (float)
+- calculated_at (timestamp)
+
+ANALYTICS ENDPOINTS
+
+1. Get Analytics Status (Polling)
+GET /forms/:form_id/analytics/status
+Headers:
+Authorization: Bearer <access_token>
+
+Response (200):
+{
+  "status": "not_started",
+  "message": "Analytics have not been calculated yet",
+  "calculated_at": null
+}
+
+Status values:
+- not_started: No analytics calculated yet
+- pending: Calculation queued
+- calculating: In progress
+- completed: Ready
+- failed: Calculation failed
+
+Example:
+TOKEN="your_access_token"
+FORM_ID="form-uuid"
+curl -X GET "http://localhost:3030/forms/$FORM_ID/analytics/status" \
+  -H "Authorization: Bearer $TOKEN"
+
+2. Get Node Analytics
+GET /forms/:form_id/analytics/nodes
+Headers:
+Authorization: Bearer <access_token>
+
+Response (200):
+{
+  "form_id": "form-uuid",
+  "summary": {
+    "total_responses": 100,
+    "total_answers": 185,
+    "avg_time_per_node": 19.65,
+    "total_nodes": 2
+  },
+  "nodes": [
+    {
+      "form_id": "form-uuid",
+      "flow_connection_id": "node-uuid-1",
+      "question_text": "What is your department?",
+      "question_type": "question",
+      "visit_count": 100,
+      "answer_count": 95,
+      "skip_count": 5,
+      "drop_off_count": 0,
+      "total_time_spent": 1200,
+      "avg_time_spent": 12.6,
+      "calculated_at": "2025-01-15T10:32:45Z"
+    },
+    {
+      "form_id": "form-uuid",
+      "flow_connection_id": "node-uuid-2",
+      "question_text": "Enter your email",
+      "question_type": "input",
+      "visit_count": 95,
+      "answer_count": 90,
+      "skip_count": 5,
+      "drop_off_count": 95,
+      "total_time_spent": 2400,
+      "avg_time_spent": 26.7,
+      "calculated_at": "2025-01-15T10:32:45Z"
+    }
+  ]
+}
+
+Example:
+TOKEN="your_access_token"
+FORM_ID="form-uuid"
+curl -X GET "http://localhost:3030/forms/$FORM_ID/analytics/nodes" \
+  -H "Authorization: Bearer $TOKEN"
+
+NODE METRICS EXPLAINED
+
+question_text:
+- The actual text of the question/option/input
+- Helps identify which node the metrics refer to
+- No need to cross-reference with flow data
+
+question_type:
+- Type of node: 'question', 'option', or 'input'
+- Indicates the node's role in the flow
+
+visit_count:
+- How many times this node appeared in flow_path
+- Indicates how many users reached this step
+
+answer_count:
+- How many times users answered this node
+- Indicates engagement
+
+skip_count:
+- visit_count - answer_count
+- Users saw the node but didn't answer
+- HIGH SKIP = Potential pain point
+
+drop_off_count:
+- How many users ended their journey at this node
+- Last item in flow_path
+- HIGH DROP-OFF = Potential blocker
+
+avg_time_spent:
+- Average time users spent on this node
+- In seconds
+- HIGH TIME = Confusing or difficult question
+
+CALCULATION LOGIC
+
+1. First Request:
+   - Fetches all responses for the form
+   - Processes flow_path and answers
+   - Calculates metrics per node
+   - Saves to analytics_nodes table
+   - Returns calculated metrics
+
+2. Subsequent Requests:
+   - Reads from analytics_nodes table (instant)
+   - No recalculation needed
+
+3. Node Processing:
+   - For each response, iterate through flow_path
+   - Track which nodes were visited
+   - Check if node has corresponding answer
+   - If last node in path → increment drop_off_count
+   - If visited but not answered → increment skip_count
+   - Accumulate time_spent from answers
+   - Calculate avg_time_spent
+
+PAIN POINT DETECTION
+
+Identify problematic nodes:
+
+1. High Skip Rate:
+   skip_count / visit_count > 20%
+   → Optional field being avoided
+
+2. High Drop-Off:
+   drop_off_count / visit_count > 30%
+   → Users abandoning here
+
+3. High Time Spent:
+   avg_time_spent > 2x average
+   → Confusing or difficult
+
+4. Low Completion:
+   answer_count / visit_count < 80%
+   → Unclear or problematic
+
+Example Query:
+SELECT flow_connection_id,
+       visit_count,
+       skip_count,
+       (skip_count::float / visit_count) as skip_rate,
+       avg_time_spent
+FROM analytics_nodes
+WHERE form_id = 'uuid'
+  AND (skip_count::float / visit_count) > 0.2
+ORDER BY skip_rate DESC;
+
+CACHING STRATEGY
+
+- Analytics are calculated once and cached
+- Stored in analytics_nodes table
+- Fast reads on subsequent requests
+- Recalculation triggered by:
+  - Manual refresh (future)
+  - After N new responses (future)
+  - Scheduled jobs (future)
+
+SECURITY
+- All endpoints require JWT authentication
+- Users can only access analytics for their own forms
+- No public analytics endpoints
+
+MIGRATIONS
+- Raw SQL only
+- Files:
+  migrations/009_create_analytics_tables.up.sql
+  migrations/009_create_analytics_tables.down.sql
+
+INTEGRATION
+- Forms module: Provides form_id
+- Flow module: Provides flow_connections (nodes)
+- Responses module: Provides response data for calculations
+- Analytics module: Processes and stores metrics
+
+WORKFLOW
+1. User creates form with flow
+2. Users submit responses
+3. Owner requests analytics
+4. System calculates metrics (first time)
+5. Metrics cached in database
+6. Subsequent requests read from cache
+7. Owner identifies pain points
+
+TESTING RESULTS
+All features tested and verified:
+✅ Node-level metrics calculation
+✅ Visit count tracking
+✅ Answer rate calculation
+✅ Skip detection
+✅ Drop-off tracking
+✅ Average time calculation
+✅ Caching mechanism (instant reads)
+✅ Status polling endpoint
+
+SAMPLE ANALYTICS INSIGHTS
+
+Example form with 100 responses:
+
+Node 1:
+- question_text: "Welcome! What brings you here today?"
+- question_type: "question"
+- visit_count: 100 (everyone saw it)
+- answer_count: 100 (100% answered)
+- skip_count: 0
+- drop_off_count: 0
+- avg_time_spent: 5 seconds
+→ HEALTHY: Clear question, everyone proceeds
+
+Node 2:
+- question_text: "Enter your email"
+- question_type: "input"
+- visit_count: 100
+- answer_count: 95 (95% answered)
+- skip_count: 5 (5% skipped)
+- drop_off_count: 2
+- avg_time_spent: 8 seconds
+→ GOOD: Most users complete, minor skips
+
+Node 3:
+- question_text: "Please describe your experience in detail"
+- question_type: "input"
+- visit_count: 95
+- answer_count: 60 (63% answered)
+- skip_count: 35 (37% skipped!)
+- drop_off_count: 30 (32% drop off!)
+- avg_time_spent: 45 seconds (high!)
+→ PAIN POINT: High skip rate, high drop-off, high time
+→ ACTION: Simplify question or make it clearer
+
+IMPORTANT NOTES
+- First request calculates and caches
+- Subsequent requests are instant (read from DB)
+- All timestamps in UTC
+- Metrics stored per form_id + flow_connection_id
+- Drop-off detection: last node in flow_path
+- Skip detection: in flow_path but not in answers
+
+FUTURE EXTENSIONS (NOT IMPLEMENTED)
+- Manual refresh endpoint (POST /analytics/refresh)
+- Auto-recalculation after N new responses
+- Scheduled recalculation (daily/hourly)
+- Path analytics (most common paths)
+- Funnel visualization data
+- Comparison analytics (before/after changes)
+- Export analytics (CSV, PDF)
+- Real-time analytics (WebSocket updates)
+- Benchmarking (compare to similar forms)
+- A/B testing support
+- Heatmap data for visualization
+- Trend analysis (analytics over time)
+- Alerts for significant changes
+
+STATUS
+Node analytics module is complete and working.
+Calculation, caching, and retrieval fully tested with real data.
+Ready for pain point detection and optimization insights.

@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"smart-forms/internal/analytics"
 	"smart-forms/internal/auth"
 	"smart-forms/internal/flows"
 	"smart-forms/internal/forms"
@@ -84,6 +85,10 @@ func main() {
 	responsesService := responses.NewResponsesService(responsesRepo)
 	responsesHandler := responses.NewResponsesHandler(responsesService)
 
+	analyticsRepo := analytics.NewAnalyticsRepository(db)
+	analyticsService := analytics.NewAnalyticsService(analyticsRepo)
+	analyticsHandler := analytics.NewAnalyticsHandler(analyticsService)
+
 	// Public routes (no auth) - MUST be before protected group
 	app.Get("/f/:slug", linksHandler.GetPublicForm)
 	app.Post("/f/:slug/responses", responsesHandler.SubmitResponse)
@@ -116,6 +121,10 @@ func main() {
 	// Responses routes (protected)
 	api.Get("/forms/:form_id/responses", responsesHandler.GetFormResponses)
 	api.Get("/responses/:response_id", responsesHandler.GetResponseDetails)
+
+	// Analytics routes (protected)
+	api.Get("/forms/:form_id/analytics/status", analyticsHandler.GetAnalyticsStatus)
+	api.Get("/forms/:form_id/analytics/nodes", analyticsHandler.GetNodeAnalytics)
 
 	port := os.Getenv("PORT")
 	if port == "" {

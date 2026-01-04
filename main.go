@@ -125,6 +125,7 @@ func main() {
 	// Analytics routes (protected)
 	api.Get("/forms/:form_id/analytics/status", analyticsHandler.GetAnalyticsStatus)
 	api.Get("/forms/:form_id/analytics/nodes", analyticsHandler.GetNodeAnalytics)
+	api.Get("/forms/:form_id/analytics/flow", analyticsHandler.GetFlowAnalytics)
 
 	port := os.Getenv("PORT")
 	if port == "" {

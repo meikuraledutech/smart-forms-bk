@@ -121,6 +121,55 @@ FORM_ID="form-uuid"
 curl -X GET "http://localhost:3030/forms/$FORM_ID/analytics/nodes" \
   -H "Authorization: Bearer $TOKEN"
 
+3. Get Flow Analytics (Sankey Diagram)
+GET /forms/:form_id/analytics/flow
+Headers:
+Authorization: Bearer <access_token>
+
+Response (200):
+{
+  "form_id": "form-uuid",
+  "flows": [
+    {
+      "source": "What is your department?",
+      "target": "Engineering",
+      "value": 45
+    },
+    {
+      "source": "Engineering",
+      "target": "How long have you been here?",
+      "value": 43
+    },
+    {
+      "source": "Engineering",
+      "target": "Drop-off",
+      "value": 2
+    },
+    {
+      "source": "What is your department?",
+      "target": "Marketing",
+      "value": 30
+    },
+    {
+      "source": "Marketing",
+      "target": "How long have you been here?",
+      "value": 28
+    },
+    {
+      "source": "Marketing",
+      "target": "Drop-off",
+      "value": 2
+    }
+  ],
+  "mermaid": "sankey-beta\n\nWhat is your department?,Engineering,45\nEngineering,How long have you been here?,43\n..."
+}
+
+Example:
+TOKEN="your_access_token"
+FORM_ID="form-uuid"
+curl -X GET "http://localhost:3030/forms/$FORM_ID/analytics/flow" \
+  -H "Authorization: Bearer $TOKEN"
+
 NODE METRICS EXPLAINED
 
 question_text:
@@ -154,6 +203,43 @@ avg_time_spent:
 - Average time users spent on this node
 - In seconds
 - HIGH TIME = Confusing or difficult question
+
+FLOW ANALYTICS (SANKEY DIAGRAM)
+
+Flow analytics tracks transitions between nodes to visualize user journeys.
+Perfect for understanding how users navigate through your form.
+
+Flows Array:
+- source: Question text of the starting node
+- target: Question text of the destination node (or "Drop-off")
+- value: Number of users who made this transition
+
+Mermaid String:
+- Ready-to-use Mermaid syntax for Sankey diagram
+- Can be directly rendered in Mermaid-compatible tools
+- Format: source,target,value (one per line)
+
+Use Cases:
+- Visualize user flow through the form
+- Identify where users branch based on their answers
+- See which paths lead to completion vs drop-off
+- Detect bottlenecks in the user journey
+
+Example Mermaid Rendering:
+```mermaid
+sankey-beta
+
+What is your department?,Engineering,45
+Engineering,How long have you been here?,43
+Engineering,Drop-off,2
+What is your department?,Marketing,30
+Marketing,How long have you been here?,28
+Marketing,Drop-off,2
+```
+
+This creates a visual flow diagram showing:
+- 45 users selected Engineering → 43 continued, 2 dropped off
+- 30 users selected Marketing → 28 continued, 2 dropped off
 
 CALCULATION LOGIC
 
@@ -254,6 +340,8 @@ All features tested and verified:
 ✅ Average time calculation
 ✅ Caching mechanism (instant reads)
 ✅ Status polling endpoint
+✅ Flow analytics with Sankey diagram support
+✅ Question text enrichment for flow transitions
 
 SAMPLE ANALYTICS INSIGHTS
 
@@ -314,6 +402,8 @@ FUTURE EXTENSIONS (NOT IMPLEMENTED)
 - Alerts for significant changes
 
 STATUS
-Node analytics module is complete and working.
-Calculation, caching, and retrieval fully tested with real data.
-Ready for pain point detection and optimization insights.
+✅ Node analytics module - Complete and working
+✅ Flow analytics module - Complete and working
+- Calculation, caching, and retrieval fully tested with real data
+- Sankey diagram support for visual flow representation
+- Ready for pain point detection and optimization insights

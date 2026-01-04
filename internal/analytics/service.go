@@ -3,11 +3,13 @@ package analytics
 import (
 	"context"
 	"smart-forms/internal/analytics/calculators"
+	"strconv"
 )
 
 type AnalyticsService struct {
 	repo            *AnalyticsRepository
 	nodeCalculator  calculators.NodeCalculator
+	flowCalculator  calculators.FlowCalculator
 	pathCalculator  calculators.PathCalculator
 }
 
@@ -15,6 +17,7 @@ func NewAnalyticsService(repo *AnalyticsRepository) *AnalyticsService {
 	return &AnalyticsService{
 		repo:           repo,
 		nodeCalculator: calculators.NewNodeCalculator(repo),
+		flowCalculator: calculators.NewFlowCalculator(repo),
 		// TODO: Initialize path calculator when implementing path analytics
 		// pathCalculator:  calculators.NewPathCalculator(repo),
 	}
@@ -146,4 +149,40 @@ func (s *AnalyticsService) GetNodeMetrics(ctx context.Context, formID string) ([
 func (s *AnalyticsService) GetPathMetrics(ctx context.Context, formID string) ([]PathMetrics, error) {
 	// TODO: Implement
 	return nil, nil
+}
+
+// GetFlowAnalytics retrieves flow transitions for Sankey diagram
+func (s *AnalyticsService) GetFlowAnalytics(ctx context.Context, formID string) (*FlowAnalytics, error) {
+	// Calculate flow transitions
+	calcTransitions, err := s.flowCalculator.Calculate(ctx, formID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(calcTransitions) == 0 {
+		return &FlowAnalytics{
+			FormID:  formID,
+			Flows:   []FlowTransition{},
+			Mermaid: "",
+		}, nil
+	}
+
+	// Enrich with question text
+	enrichedFlows, err := s.repo.EnrichFlowTransitions(ctx, calcTransitions)
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate Mermaid syntax
+	mermaid := "sankey-beta\n\n"
+	for _, flow := range enrichedFlows {
+		// Format: Source,Target,Value
+		mermaid += flow.Source + "," + flow.Target + "," + strconv.Itoa(flow.Value) + "\n"
+	}
+
+	return &FlowAnalytics{
+		FormID:  formID,
+		Flows:   enrichedFlows,
+		Mermaid: mermaid,
+	}, nil
 }

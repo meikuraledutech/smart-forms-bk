@@ -55,3 +55,17 @@ type StatusResponse struct {
 	CalculatedAt *time.Time `json:"calculated_at,omitempty"`
 	Message      string     `json:"message,omitempty"`
 }
+
+// FlowTransition represents a transition from one node to another
+type FlowTransition struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Value  int    `json:"value"`
+}
+
+// FlowAnalytics represents the complete flow analytics for Sankey visualization
+type FlowAnalytics struct {
+	FormID  string           `json:"form_id"`
+	Flows   []FlowTransition `json:"flows"`
+	Mermaid string           `json:"mermaid"`
+}

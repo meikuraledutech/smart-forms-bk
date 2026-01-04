@@ -118,6 +118,19 @@ func (h *AnalyticsHandler) GetPathAnalytics(c *fiber.Ctx) error {
 	})
 }
 
+// GetFlowAnalytics retrieves flow transitions for Sankey diagram
+// GET /forms/:form_id/analytics/flow
+func (h *AnalyticsHandler) GetFlowAnalytics(c *fiber.Ctx) error {
+	formID := c.Params("form_id")
+
+	flowAnalytics, err := h.service.GetFlowAnalytics(c.Context(), formID)
+	if err != nil {
+		return mapServiceError(err)
+	}
+
+	return c.JSON(flowAnalytics)
+}
+
 func mapServiceError(err error) error {
 	switch err {
 	case ErrFormNotFound:

@@ -15,6 +15,11 @@ type PathCalculator interface {
 	Calculate(ctx context.Context, formID string) ([]PathMetrics, error)
 }
 
+// FlowCalculator calculates flow transitions for Sankey diagrams
+type FlowCalculator interface {
+	Calculate(ctx context.Context, formID string) ([]FlowTransition, error)
+}
+
 // NodeMetrics represents calculated metrics for a node (matches analytics.NodeMetrics)
 type NodeMetrics struct {
 	FormID           string
@@ -36,4 +41,14 @@ type PathMetrics struct {
 	AvgCompletionTime float64
 	CompletionRate    float64
 	CalculatedAt      time.Time
+}
+
+// FlowTransition represents a transition from one node to another
+type FlowTransition struct {
+	Source      string
+	Target      string
+	Value       int
+	SourceID    string
+	TargetID    string
+	IsDropOff   bool
 }

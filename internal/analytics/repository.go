@@ -220,3 +220,64 @@ func (r *AnalyticsRepository) GetResponseData(ctx context.Context, formID string
 
 	return responses, nil
 }
+
+// EnrichFlowTransitions adds question text to flow transitions
+func (r *AnalyticsRepository) EnrichFlowTransitions(ctx context.Context, transitions []calculators.FlowTransition) ([]FlowTransition, error) {
+	if len(transitions) == 0 {
+		return []FlowTransition{}, nil
+	}
+
+	// Map to cache question texts
+	nodeTexts := make(map[string]string)
+
+	enriched := make([]FlowTransition, len(transitions))
+	for i, t := range transitions {
+		// Get source text
+		sourceText := t.SourceID
+		if _, exists := nodeTexts[t.SourceID]; !exists {
+			var questionText string
+			err := r.db.QueryRow(ctx, `
+				SELECT q.question_text
+				FROM flow_connections fc
+				JOIN questions q ON fc.question_id = q.id
+				WHERE fc.id = $1
+			`, t.SourceID).Scan(&questionText)
+			if err == nil {
+				nodeTexts[t.SourceID] = questionText
+			} else {
+				nodeTexts[t.SourceID] = t.SourceID // Fallback to ID
+			}
+		}
+		sourceText = nodeTexts[t.SourceID]
+
+		// Get target text
+		targetText := t.TargetID
+		if t.IsDropOff {
+			targetText = "Drop-off"
+		} else {
+			if _, exists := nodeTexts[t.TargetID]; !exists {
+				var questionText string
+				err := r.db.QueryRow(ctx, `
+					SELECT q.question_text
+					FROM flow_connections fc
+					JOIN questions q ON fc.question_id = q.id
+					WHERE fc.id = $1
+				`, t.TargetID).Scan(&questionText)
+				if err == nil {
+					nodeTexts[t.TargetID] = questionText
+				} else {
+					nodeTexts[t.TargetID] = t.TargetID // Fallback to ID
+				}
+			}
+			targetText = nodeTexts[t.TargetID]
+		}
+
+		enriched[i] = FlowTransition{
+			Source: sourceText,
+			Target: targetText,
+			Value:  t.Value,
+		}
+	}
+
+	return enriched, nil
+}

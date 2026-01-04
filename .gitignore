@@ -50,3 +50,12 @@ Thumbs.db
 # =========================
 tmp/
 temp/
+
+*.pem
+
+# =========================
+# Compiled binaries
+# =========================
+smart-forms-backend
+smart-forms-backend-linux
+smart-forms-backend-*

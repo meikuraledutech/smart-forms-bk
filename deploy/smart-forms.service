@@ -1,0 +1,29 @@
+[Unit]
+Description=Smart Forms Backend API
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/app
+ExecStart=/home/ec2-user/app/smart-forms-backend
+
+# Auto-restart configuration
+Restart=always
+RestartSec=5
+StartLimitInterval=0
+StartLimitBurst=0
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=smart-forms
+
+# Security
+NoNewPrivileges=true
+
+# Environment
+Environment="GIN_MODE=release"
+
+[Install]
+WantedBy=multi-user.target

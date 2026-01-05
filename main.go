@@ -197,9 +197,22 @@ func statusHandler(c *fiber.Ctx) error {
 func connectDB() *pgxpool.Pool {
 	connStr := os.Getenv("DATABASE_URL")
 
-	// Use context.Background() for long-lived pool
-	// pgxpool manages its own connection lifecycle and timeouts
-	pool, err := pgxpool.New(context.Background(), connStr)
+	// Parse connection string and configure pool
+	config, err := pgxpool.ParseConfig(connStr)
+	if err != nil {
+		log.Fatal("Failed to parse database URL:", err)
+	}
+
+	// Connection pool configuration optimized for 916MB RAM server
+	config.MaxConns = 15                           // Maximum connections (balance between throughput and memory)
+	config.MinConns = 3                            // Minimum idle connections (keep connections warm)
+	config.MaxConnLifetime = 1 * time.Hour         // Recycle connections after 1 hour
+	config.MaxConnIdleTime = 15 * time.Minute      // Close idle connections after 15 minutes
+	config.HealthCheckPeriod = 1 * time.Minute     // Health check every minute
+	config.ConnConfig.ConnectTimeout = 5 * time.Second // Connection timeout
+
+	// Create pool with configuration
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		log.Fatal("Database connection failed:", err)
 	}
@@ -212,6 +225,7 @@ func connectDB() *pgxpool.Pool {
 		log.Fatal("Database ping failed:", err)
 	}
 
-	log.Println("Database pool created and verified successfully")
+	log.Printf("Database pool created successfully (max: %d, min: %d)",
+		config.MaxConns, config.MinConns)
 	return pool
 }

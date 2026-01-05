@@ -4,15 +4,21 @@ import (
 	"context"
 	"strings"
 
+	"smart-forms/internal/responses/buffer"
+
 	"github.com/google/uuid"
 )
 
 type ResponsesService struct {
-	repo *ResponsesRepository
+	repo   *ResponsesRepository
+	buffer *buffer.ResponseBuffer
 }
 
-func NewResponsesService(repo *ResponsesRepository) *ResponsesService {
-	return &ResponsesService{repo: repo}
+func NewResponsesService(repo *ResponsesRepository, buf *buffer.ResponseBuffer) *ResponsesService {
+	return &ResponsesService{
+		repo:   repo,
+		buffer: buf,
+	}
 }
 
 // SubmitResponse handles form response submission
@@ -62,20 +68,37 @@ func (s *ResponsesService) SubmitResponse(ctx context.Context, slug string, req 
 		}
 	}
 
-	// Create response record
-	responseID, err := s.repo.CreateResponse(ctx, formID, req.Metadata.TotalTimeSpent, req.Metadata.FlowPath, nil)
+	// Generate response ID immediately
+	responseID := uuid.New().String()
+
+	// Prepare answers for buffering
+	answers := make([]buffer.AnswerData, len(req.Responses))
+	for i, answer := range req.Responses {
+		answers[i] = buffer.AnswerData{
+			ResponseID:       responseID,
+			FlowConnectionID: answer.FlowConnectionID,
+			AnswerText:       answer.AnswerText,
+			AnswerValue:      answer.AnswerValue,
+			TimeSpent:        answer.TimeSpent,
+		}
+	}
+
+	// Enqueue for batch processing
+	responseData := buffer.ResponseData{
+		ResponseID:     responseID,
+		FormID:         formID,
+		TotalTimeSpent: req.Metadata.TotalTimeSpent,
+		FlowPath:       req.Metadata.FlowPath,
+		Metadata:       nil,
+		Answers:        answers,
+	}
+
+	err = s.buffer.Enqueue(responseData)
 	if err != nil {
 		return "", err
 	}
 
-	// Create answer records
-	for _, answer := range req.Responses {
-		err := s.repo.CreateAnswer(ctx, responseID, answer.FlowConnectionID, answer.AnswerText, answer.AnswerValue, answer.TimeSpent)
-		if err != nil {
-			return "", err
-		}
-	}
-
+	// Return immediately to user (data will be inserted in batch)
 	return responseID, nil
 }
 

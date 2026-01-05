@@ -15,6 +15,7 @@ import (
 	"smart-forms/internal/migrations"
 	"smart-forms/internal/questions"
 	"smart-forms/internal/responses"
+	"smart-forms/internal/responses/buffer"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -53,6 +54,15 @@ func main() {
 	}
 	defer formCache.Close()
 	log.Println("Cache initialized successfully (100MB limit, 5min TTL)")
+
+	// Initialize response buffer for batch inserts
+	responseBuffer := buffer.NewResponseBuffer(
+		db,
+		500,              // Queue size
+		50,               // Batch size
+		300*time.Millisecond, // Flush interval
+	)
+	defer responseBuffer.Close()
 
 	app := fiber.New()
 
@@ -103,7 +113,7 @@ func main() {
 	linksHandler := links.NewLinksHandler(linksService)
 
 	responsesRepo := responses.NewResponsesRepository(db)
-	responsesService := responses.NewResponsesService(responsesRepo)
+	responsesService := responses.NewResponsesService(responsesRepo, responseBuffer)
 	responsesHandler := responses.NewResponsesHandler(responsesService)
 
 	analyticsRepo := analytics.NewAnalyticsRepository(db)

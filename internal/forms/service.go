@@ -112,6 +112,9 @@ func (s *FormsService) Update(
 		return ErrInvalidInput
 	}
 
+	// Get slugs before update (for cache invalidation)
+	autoSlug, customSlug, _ := s.repo.GetFormSlugs(ctx, formID)
+
 	// Update in database
 	err := s.repo.Update(ctx, userID, formID, title, description, status)
 	if err != nil {
@@ -119,8 +122,16 @@ func (s *FormsService) Update(
 	}
 
 	// Invalidate cache after successful update
-	cacheKey := cache.FormIDKey(formID)
-	s.cache.Delete(cacheKey)
+	// Delete by form ID
+	s.cache.Delete(cache.FormIDKey(formID))
+
+	// Delete by slugs (if form was published)
+	if autoSlug != nil && *autoSlug != "" {
+		s.cache.Delete(cache.FormSlugKey(*autoSlug))
+	}
+	if customSlug != nil && *customSlug != "" {
+		s.cache.Delete(cache.FormSlugKey(*customSlug))
+	}
 
 	return nil
 }
@@ -136,6 +147,9 @@ func (s *FormsService) SoftDelete(
 	formID string,
 ) error {
 
+	// Get slugs before delete (for cache invalidation)
+	autoSlug, customSlug, _ := s.repo.GetFormSlugs(ctx, formID)
+
 	// Delete from database
 	err := s.repo.SoftDelete(ctx, userID, formID)
 	if err != nil {
@@ -143,8 +157,16 @@ func (s *FormsService) SoftDelete(
 	}
 
 	// Invalidate cache after successful delete
-	cacheKey := cache.FormIDKey(formID)
-	s.cache.Delete(cacheKey)
+	// Delete by form ID
+	s.cache.Delete(cache.FormIDKey(formID))
+
+	// Delete by slugs (if form was published)
+	if autoSlug != nil && *autoSlug != "" {
+		s.cache.Delete(cache.FormSlugKey(*autoSlug))
+	}
+	if customSlug != nil && *customSlug != "" {
+		s.cache.Delete(cache.FormSlugKey(*customSlug))
+	}
 
 	return nil
 }

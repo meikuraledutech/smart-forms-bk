@@ -135,3 +135,18 @@ func (r *FlowRepository) VerifyFormOwnership(ctx context.Context, formID, userID
 
 	return nil
 }
+
+// GetFormSlugs retrieves slugs for cache invalidation
+func (r *FlowRepository) GetFormSlugs(ctx context.Context, formID string) (*string, *string, error) {
+	var autoSlug, customSlug *string
+	err := r.db.QueryRow(ctx, `
+		SELECT auto_slug, custom_slug
+		FROM forms
+		WHERE id = $1 AND deleted_at IS NULL
+	`, formID).Scan(&autoSlug, &customSlug)
+	
+	if err != nil {
+		return nil, nil, err
+	}
+	return autoSlug, customSlug, nil
+}

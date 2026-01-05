@@ -49,21 +49,41 @@ func (s *LinksService) PublishForm(ctx context.Context, formID, userID string, c
 		customSlug = nil
 	}
 
+	// Get old slugs before publishing (for cache invalidation)
+	oldAutoSlug, oldCustomSlug, _ := s.repo.GetFormSlugs(ctx, formID, userID)
+
 	// Publish the form
 	err := s.repo.PublishForm(ctx, formID, userID, autoSlug, customSlug)
 	if err != nil {
 		return "", nil, err
 	}
 
-	// Invalidate old cache entries (form might have been cached before)
-	formIDKey := cache.FormIDKey(formID)
-	s.cache.Delete(formIDKey)
+	// Invalidate cache entries
+	// Delete by form ID
+	s.cache.Delete(cache.FormIDKey(formID))
+
+	// Delete old slugs (if different from new)
+	if oldAutoSlug != "" && oldAutoSlug != autoSlug {
+		s.cache.Delete(cache.FormSlugKey(oldAutoSlug))
+	}
+	if oldCustomSlug != nil && *oldCustomSlug != "" {
+		s.cache.Delete(cache.FormSlugKey(*oldCustomSlug))
+	}
+
+	// Delete new slugs (will be re-cached on next access)
+	s.cache.Delete(cache.FormSlugKey(autoSlug))
+	if customSlug != nil && *customSlug != "" {
+		s.cache.Delete(cache.FormSlugKey(*customSlug))
+	}
 
 	return autoSlug, customSlug, nil
 }
 
 // ToggleAcceptingResponses toggles whether a form accepts responses
 func (s *LinksService) ToggleAcceptingResponses(ctx context.Context, formID, userID string, accepting bool) error {
+	// Get slugs before toggle (for cache invalidation)
+	autoSlug, customSlug, _ := s.repo.GetFormSlugs(ctx, formID, userID)
+
 	// Update in database
 	err := s.repo.ToggleAcceptingResponses(ctx, formID, userID, accepting)
 	if err != nil {
@@ -71,8 +91,16 @@ func (s *LinksService) ToggleAcceptingResponses(ctx context.Context, formID, use
 	}
 
 	// Invalidate cache after toggle
-	formIDKey := cache.FormIDKey(formID)
-	s.cache.Delete(formIDKey)
+	// Delete by form ID
+	s.cache.Delete(cache.FormIDKey(formID))
+
+	// Delete by slugs (if form was published)
+	if autoSlug != "" {
+		s.cache.Delete(cache.FormSlugKey(autoSlug))
+	}
+	if customSlug != nil && *customSlug != "" {
+		s.cache.Delete(cache.FormSlugKey(*customSlug))
+	}
 
 	return nil
 }

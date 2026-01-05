@@ -43,8 +43,17 @@ func (s *FlowService) UpdateFlow(ctx context.Context, userID, formID string, req
 	}
 
 	// Invalidate cache after flow structure changes
-	cacheKey := cache.FormIDKey(formID)
-	s.cache.Delete(cacheKey)
+	// Delete by form ID
+	s.cache.Delete(cache.FormIDKey(formID))
+
+	// Delete by slugs (if form was published)
+	autoSlug, customSlug, _ := s.repo.GetFormSlugs(ctx, formID)
+	if autoSlug != nil && *autoSlug != "" {
+		s.cache.Delete(cache.FormSlugKey(*autoSlug))
+	}
+	if customSlug != nil && *customSlug != "" {
+		s.cache.Delete(cache.FormSlugKey(*customSlug))
+	}
 
 	return mapping, nil
 }

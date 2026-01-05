@@ -298,3 +298,31 @@ func (r *FormsRepository) SoftDelete(
 
 	return nil
 }
+
+/*
+========================
+ GET FORM SLUGS
+========================
+*/
+func (r *FormsRepository) GetFormSlugs(
+	ctx context.Context,
+	formID string,
+) (*string, *string, error) {
+	var autoSlug, customSlug *string
+
+	const query = `
+		SELECT auto_slug, custom_slug
+		FROM forms
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	err := r.db.QueryRow(ctx, query, formID).Scan(&autoSlug, &customSlug)
+	if err == pgx.ErrNoRows {
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return autoSlug, customSlug, nil
+}

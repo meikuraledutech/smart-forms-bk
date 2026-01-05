@@ -98,10 +98,10 @@ func (h *LinksHandler) GetPublicForm(c *fiber.Ctx) error {
 	}
 
 	// Set cache headers
-	// public: Can be cached by browsers and CDNs
-	// max-age=300: Browser caches for 5 minutes
-	// s-maxage=3600: CDN (Vercel) caches for 1 hour
-	c.Set("Cache-Control", "public, max-age=300, s-maxage=3600")
+	// no-cache: Browser must revalidate with server (but can use ETag for 304)
+	// s-maxage=600: CDN (Vercel) caches for 10 minutes
+	// This ensures form updates are immediately visible while still benefiting from CDN
+	c.Set("Cache-Control", "no-cache, s-maxage=600")
 	c.Set("ETag", etag)
 
 	return c.JSON(form)

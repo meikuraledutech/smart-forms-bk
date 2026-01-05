@@ -8,6 +8,7 @@ import (
 
 	"smart-forms/internal/analytics"
 	"smart-forms/internal/auth"
+	"smart-forms/internal/cache"
 	"smart-forms/internal/flows"
 	"smart-forms/internal/forms"
 	"smart-forms/internal/links"
@@ -39,6 +40,19 @@ func main() {
 	// Connect to DB (POOL)
 	db = connectDB()
 	defer db.Close()
+
+	// Initialize cache
+	formCache, err := cache.NewCache(cache.Config{
+		MaxCost:     100 * 1024 * 1024, // 100MB
+		NumCounters: 10_000_000,        // 10M counters
+		BufferItems: 64,                // Ring buffer size
+		DefaultTTL:  5 * time.Minute,   // 5 minute TTL
+	})
+	if err != nil {
+		log.Fatal("Failed to initialize cache:", err)
+	}
+	defer formCache.Close()
+	log.Println("Cache initialized successfully (100MB limit, 5min TTL)")
 
 	app := fiber.New()
 
@@ -85,7 +99,7 @@ func main() {
 	flowHandler := flows.NewFlowHandler(flowService)
 
 	linksRepo := links.NewLinksRepository(db)
-	linksService := links.NewLinksService(linksRepo)
+	linksService := links.NewLinksService(linksRepo, formCache)
 	linksHandler := links.NewLinksHandler(linksService)
 
 	responsesRepo := responses.NewResponsesRepository(db)

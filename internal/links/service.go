@@ -6,14 +6,21 @@ import (
 	"encoding/base64"
 	"regexp"
 	"strings"
+	"time"
+
+	"smart-forms/internal/cache"
 )
 
 type LinksService struct {
-	repo *LinksRepository
+	repo  *LinksRepository
+	cache *cache.Cache
 }
 
-func NewLinksService(repo *LinksRepository) *LinksService {
-	return &LinksService{repo: repo}
+func NewLinksService(repo *LinksRepository, cacheClient *cache.Cache) *LinksService {
+	return &LinksService{
+		repo:  repo,
+		cache: cacheClient,
+	}
 }
 
 // PublishForm publishes a form with auto-generated and optional custom slug
@@ -58,6 +65,17 @@ func (s *LinksService) ToggleAcceptingResponses(ctx context.Context, formID, use
 
 // GetPublicForm retrieves a form by slug for public view
 func (s *LinksService) GetPublicForm(ctx context.Context, slug string) (*PublicForm, error) {
+	// Generate cache key
+	cacheKey := cache.FormSlugKey(slug)
+
+	// Try to get from cache
+	if cached, found := s.cache.Get(cacheKey); found {
+		if form, ok := cached.(*PublicForm); ok {
+			return form, nil
+		}
+	}
+
+	// Cache miss - fetch from database
 	formID, title, description, acceptingResponses, err := s.repo.GetFormBySlug(ctx, slug)
 	if err != nil {
 		return nil, err
@@ -72,7 +90,7 @@ func (s *LinksService) GetPublicForm(ctx context.Context, slug string) (*PublicF
 	// Build tree structure
 	blocks := s.buildTree(items, nil)
 
-	return &PublicForm{
+	form := &PublicForm{
 		ID:                 formID,
 		Title:              title,
 		Description:        description,
@@ -80,7 +98,16 @@ func (s *LinksService) GetPublicForm(ctx context.Context, slug string) (*PublicF
 		Flow: map[string]interface{}{
 			"blocks": blocks,
 		},
-	}, nil
+	}
+
+	// Store in cache with 5 minute TTL
+	s.cache.Set(cacheKey, form, 5*time.Minute)
+
+	// Also cache by form ID for invalidation
+	formIDKey := cache.FormIDKey(formID)
+	s.cache.Set(formIDKey, form, 5*time.Minute)
+
+	return form, nil
 }
 
 // buildTree recursively builds nested block structure

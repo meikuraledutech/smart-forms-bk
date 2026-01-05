@@ -3,14 +3,20 @@ package flows
 import (
 	"context"
 	"strings"
+
+	"smart-forms/internal/cache"
 )
 
 type FlowService struct {
-	repo *FlowRepository
+	repo  *FlowRepository
+	cache *cache.Cache
 }
 
-func NewFlowService(repo *FlowRepository) *FlowService {
-	return &FlowService{repo: repo}
+func NewFlowService(repo *FlowRepository, cacheClient *cache.Cache) *FlowService {
+	return &FlowService{
+		repo:  repo,
+		cache: cacheClient,
+	}
 }
 
 func (s *FlowService) UpdateFlow(ctx context.Context, userID, formID string, req FlowRequest) (map[string]string, error) {
@@ -35,6 +41,10 @@ func (s *FlowService) UpdateFlow(ctx context.Context, userID, formID string, req
 			return nil, err
 		}
 	}
+
+	// Invalidate cache after flow structure changes
+	cacheKey := cache.FormIDKey(formID)
+	s.cache.Delete(cacheKey)
 
 	return mapping, nil
 }

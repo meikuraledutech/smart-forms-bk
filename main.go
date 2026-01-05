@@ -87,7 +87,7 @@ func main() {
 	app.Post("/auth/register", authHandler.Register)
 
 	formsRepo := forms.NewFormsRepository(db)
-	formsService := forms.NewFormsService(formsRepo)
+	formsService := forms.NewFormsService(formsRepo, formCache)
 	formsHandler := forms.NewFormsHandler(formsService)
 
 	questionRepo := questions.NewQuestionRepository(db)
@@ -95,7 +95,7 @@ func main() {
 	questionHandler := questions.NewQuestionHandler(questionService)
 
 	flowRepo := flows.NewFlowRepository(db)
-	flowService := flows.NewFlowService(flowRepo)
+	flowService := flows.NewFlowService(flowRepo, formCache)
 	flowHandler := flows.NewFlowHandler(flowService)
 
 	linksRepo := links.NewLinksRepository(db)

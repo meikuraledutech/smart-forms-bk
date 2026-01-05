@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"strings"
+
+	"smart-forms/internal/cache"
 )
 
 // Allowed form statuses (v1)
@@ -19,12 +21,16 @@ var (
 
 // FormsService coordinates business logic
 type FormsService struct {
-	repo *FormsRepository
+	repo  *FormsRepository
+	cache *cache.Cache
 }
 
 // NewFormsService creates service
-func NewFormsService(repo *FormsRepository) *FormsService {
-	return &FormsService{repo: repo}
+func NewFormsService(repo *FormsRepository, cacheClient *cache.Cache) *FormsService {
+	return &FormsService{
+		repo:  repo,
+		cache: cacheClient,
+	}
 }
 
 /*
@@ -106,7 +112,17 @@ func (s *FormsService) Update(
 		return ErrInvalidInput
 	}
 
-	return s.repo.Update(ctx, userID, formID, title, description, status)
+	// Update in database
+	err := s.repo.Update(ctx, userID, formID, title, description, status)
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cache after successful update
+	cacheKey := cache.FormIDKey(formID)
+	s.cache.Delete(cacheKey)
+
+	return nil
 }
 
 /*
@@ -120,7 +136,17 @@ func (s *FormsService) SoftDelete(
 	formID string,
 ) error {
 
-	return s.repo.SoftDelete(ctx, userID, formID)
+	// Delete from database
+	err := s.repo.SoftDelete(ctx, userID, formID)
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cache after successful delete
+	cacheKey := cache.FormIDKey(formID)
+	s.cache.Delete(cacheKey)
+
+	return nil
 }
 
 /*

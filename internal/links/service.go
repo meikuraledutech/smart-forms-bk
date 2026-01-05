@@ -55,12 +55,26 @@ func (s *LinksService) PublishForm(ctx context.Context, formID, userID string, c
 		return "", nil, err
 	}
 
+	// Invalidate old cache entries (form might have been cached before)
+	formIDKey := cache.FormIDKey(formID)
+	s.cache.Delete(formIDKey)
+
 	return autoSlug, customSlug, nil
 }
 
 // ToggleAcceptingResponses toggles whether a form accepts responses
 func (s *LinksService) ToggleAcceptingResponses(ctx context.Context, formID, userID string, accepting bool) error {
-	return s.repo.ToggleAcceptingResponses(ctx, formID, userID, accepting)
+	// Update in database
+	err := s.repo.ToggleAcceptingResponses(ctx, formID, userID, accepting)
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cache after toggle
+	formIDKey := cache.FormIDKey(formID)
+	s.cache.Delete(formIDKey)
+
+	return nil
 }
 
 // GetPublicForm retrieves a form by slug for public view

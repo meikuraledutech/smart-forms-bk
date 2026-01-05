@@ -1,6 +1,10 @@
 package links
 
 import (
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -82,7 +86,40 @@ func (h *LinksHandler) GetPublicForm(c *fiber.Ctx) error {
 		return fiber.ErrNotFound
 	}
 
+	// Generate ETag based on form content
+	etag := generateETag(form)
+
+	// Check If-None-Match header for conditional request
+	clientETag := c.Get("If-None-Match")
+	if clientETag == etag {
+		// Content hasn't changed, return 304 Not Modified
+		c.Set("ETag", etag)
+		return c.SendStatus(fiber.StatusNotModified)
+	}
+
+	// Set cache headers
+	// public: Can be cached by browsers and CDNs
+	// max-age=300: Browser caches for 5 minutes
+	// s-maxage=3600: CDN (Vercel) caches for 1 hour
+	c.Set("Cache-Control", "public, max-age=300, s-maxage=3600")
+	c.Set("ETag", etag)
+
 	return c.JSON(form)
+}
+
+// generateETag creates a unique hash of the form content
+func generateETag(form *PublicForm) string {
+	// Marshal form to JSON for consistent hashing
+	data, err := json.Marshal(form)
+	if err != nil {
+		// Fallback to form ID if marshaling fails
+		return fmt.Sprintf(`"%s"`, form.ID)
+	}
+
+	// Generate SHA256 hash
+	hash := sha256.Sum256(data)
+	// Return first 16 hex characters wrapped in quotes (standard ETag format)
+	return fmt.Sprintf(`"%.16x"`, hash[:8])
 }
 
 func mapServiceError(err error) error {

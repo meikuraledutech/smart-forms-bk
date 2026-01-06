@@ -11,7 +11,7 @@ import (
 // User represents auth user (internal use only)
 type User struct {
 	ID           string
-	Username     string
+	Email        string
 	PasswordHash string
 	IsActive     bool
 	Role         string // 'user' or 'super_admin'
@@ -34,41 +34,41 @@ func NewAuthRepository(db *pgxpool.Pool) *AuthRepository {
 */
 func (r *AuthRepository) CreateUser(
 	ctx context.Context,
-	username string,
+	email string,
 	passwordHash string,
 ) error {
 
 	const query = `
-		INSERT INTO users (username, password_hash)
+		INSERT INTO users (email, password_hash)
 		VALUES ($1, $2)
 	`
 
-	_, err := r.db.Exec(ctx, query, username, passwordHash)
+	_, err := r.db.Exec(ctx, query, email, passwordHash)
 	return err
 }
 
 /*
 ========================
- GET USER BY USERNAME
+ GET USER BY EMAIL
 ========================
 */
-func (r *AuthRepository) GetUserByUsername(
+func (r *AuthRepository) GetUserByEmail(
 	ctx context.Context,
-	username string,
+	email string,
 ) (*User, error) {
 
 	const query = `
-		SELECT id, username, password_hash, is_active, role
+		SELECT id, email, password_hash, is_active, role
 		FROM users
-		WHERE username = $1
+		WHERE email = $1
 	`
 
-	row := r.db.QueryRow(ctx, query, username)
+	row := r.db.QueryRow(ctx, query, email)
 
 	var user User
 	err := row.Scan(
 		&user.ID,
-		&user.Username,
+		&user.Email,
 		&user.PasswordHash,
 		&user.IsActive,
 		&user.Role,

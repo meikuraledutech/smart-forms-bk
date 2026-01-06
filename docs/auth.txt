@@ -4,7 +4,7 @@ This project implements a JWT-based authentication system with RBAC
 using Go (Fiber), PostgreSQL (Neon), and raw SQL.
 
 FEATURES
-- Register (username + password)
+- Register (email + password)
 - Login (JWT access + refresh token)
 - Refresh access token
 - Password hashing using bcrypt
@@ -20,7 +20,7 @@ AUTH ENDPOINTS
 POST /auth/register
 Body:
 {
-  "username": "admin",
+  "email": "admin@smart-forms.in",
   "password": "admin123"
 }
 
@@ -31,13 +31,13 @@ Responses:
 Example:
 curl -X POST http://localhost:3030/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
+  -d '{"email":"admin@smart-forms.in","password":"admin123"}'
 
 2. Login
 POST /auth/login
 Body:
 {
-  "username": "admin",
+  "email": "admin@smart-forms.in",
   "password": "admin123"
 }
 
@@ -47,7 +47,7 @@ Response:
   "refresh_token": "eyJhbGc...",
   "user": {
     "id": "uuid-here",
-    "username": "admin",
+    "email": "admin@smart-forms.in",
     "role": "super_admin"
   }
 }
@@ -55,7 +55,7 @@ Response:
 Example:
 curl -X POST http://localhost:3030/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
+  -d '{"email":"admin@smart-forms.in","password":"admin123"}'
 
 3. Refresh Access Token
 POST /auth/refresh
@@ -89,8 +89,8 @@ ROLE-BASED ACCESS CONTROL (RBAC)
 - RequireSuperAdmin middleware protects admin routes
 
 SUPER ADMIN BOOTSTRAP
-1. Set SUPER_ADMIN_USERNAME in .env
-2. Register user with that username
+1. Set SUPER_ADMIN_EMAIL in .env
+2. Register user with that email
 3. On first login, user is auto-promoted to super_admin
 4. Super admin has access to:
    - Manage subscription plans
@@ -102,7 +102,7 @@ ENV VARIABLES REQUIRED
 - DATABASE_URL
 - ACCESS_TOKEN_SECRET
 - REFRESH_TOKEN_SECRET
-- SUPER_ADMIN_USERNAME (optional, for super admin bootstrap)
+- SUPER_ADMIN_EMAIL (optional, for super admin bootstrap)
 
 MIGRATIONS
 - Raw SQL only
@@ -112,6 +112,8 @@ MIGRATIONS
   migrations/001_create_users.down.sql
   migrations/011_add_rbac_fields.up.sql (adds role column)
   migrations/011_add_rbac_fields.down.sql
+  migrations/012_rename_username_to_email.up.sql (renames username to email)
+  migrations/012_rename_username_to_email.down.sql
 
 MIDDLEWARE
 1. JWTAuthMiddleware()

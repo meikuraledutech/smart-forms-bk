@@ -49,24 +49,24 @@ type LoginResponse struct {
 
 // UserResponse contains user info for client
 type UserResponse struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	Role  string `json:"role"`
 }
 
 // Login validates credentials and issues tokens
 func (s *AuthService) Login(
 	ctx context.Context,
-	username string,
+	email string,
 	password string,
 ) (*LoginResponse, error) {
 
-	user, err := s.repo.GetUserByUsername(ctx, username)
+	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
 
-	// Do NOT reveal whether username exists
+	// Do NOT reveal whether email exists
 	if user == nil {
 		return nil, ErrInvalidCredentials
 	}
@@ -80,8 +80,8 @@ func (s *AuthService) Login(
 	}
 
 	// Bootstrap super admin from ENV
-	superAdminUsername := os.Getenv("SUPER_ADMIN_USERNAME")
-	if superAdminUsername != "" && username == superAdminUsername && user.Role != "super_admin" {
+	superAdminEmail := os.Getenv("SUPER_ADMIN_EMAIL")
+	if superAdminEmail != "" && email == superAdminEmail && user.Role != "super_admin" {
 		// Promote this user to super admin
 		err = s.repo.UpdateUserRole(ctx, user.ID, "super_admin")
 		if err == nil {
@@ -103,9 +103,9 @@ func (s *AuthService) Login(
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		User: UserResponse{
-			ID:       user.ID,
-			Username: user.Username,
-			Role:     user.Role,
+			ID:    user.ID,
+			Email: user.Email,
+			Role:  user.Role,
 		},
 	}, nil
 }
@@ -151,12 +151,12 @@ func (s *AuthService) RefreshAccessToken(
 // Register creates a new user
 func (s *AuthService) Register(
 	ctx context.Context,
-	username string,
+	email string,
 	password string,
 ) error {
 
 	// Check if user already exists
-	existing, err := s.repo.GetUserByUsername(ctx, username)
+	existing, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return err
 	}
@@ -171,5 +171,5 @@ func (s *AuthService) Register(
 	}
 
 	// Create user
-	return s.repo.CreateUser(ctx, username, hash)
+	return s.repo.CreateUser(ctx, email, hash)
 }

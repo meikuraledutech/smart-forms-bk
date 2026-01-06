@@ -19,7 +19,7 @@ func NewAuthHandler(service *AuthService) *AuthHandler {
 */
 
 type loginRequest struct {
-	Username string `json:"username"`
+	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
@@ -31,7 +31,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 
 	response, err := h.service.Login(
 		c.Context(),
-		req.Username,
+		req.Email,
 		req.Password,
 	)
 	if err != nil {
@@ -81,7 +81,7 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 */
 
 type registerRequest struct {
-	Username string `json:"username"`
+	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
@@ -93,15 +93,15 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		})
 	}
 
-	if req.Username == "" || req.Password == "" {
+	if req.Email == "" || req.Password == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "username and password are required",
+			"message": "email and password are required",
 		})
 	}
 
 	err := h.service.Register(
 		c.Context(),
-		req.Username,
+		req.Email,
 		req.Password,
 	)
 

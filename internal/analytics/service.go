@@ -105,8 +105,9 @@ func (s *AnalyticsService) GetNodeMetrics(ctx context.Context, formID string) ([
 		return nil, err
 	}
 
+	// If no responses yet, return empty array instead of error
 	if len(calcMetrics) == 0 {
-		return nil, ErrNoResponses
+		return []NodeMetrics{}, nil
 	}
 
 	// Convert calculator metrics to analytics metrics

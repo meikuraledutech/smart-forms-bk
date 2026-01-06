@@ -112,6 +112,11 @@ func (r *AnalyticsRepository) GetNodeMetrics(ctx context.Context, formID string)
 	return metrics, nil
 }
 
+// TODO: OPTIMIZE - Sequential Inserts Problem!
+// Currently: Executes 100+ individual INSERT queries for 100 metrics
+// Solution: Use PostgreSQL batch insert or pgx.CopyFrom
+// Example: INSERT INTO analytics_nodes VALUES ($1, $2, ...), ($3, $4, ...), ... (batch 100 rows)
+// Expected improvement: 50x faster (100 queries → 1 batch query)
 func (r *AnalyticsRepository) SaveNodeMetrics(ctx context.Context, metrics []NodeMetrics) error {
 	if len(metrics) == 0 {
 		return nil
@@ -165,6 +170,11 @@ func (r *AnalyticsRepository) DeletePathMetrics(ctx context.Context, formID stri
 
 // Raw data queries for calculations
 
+// TODO: OPTIMIZE - N+1 Query Problem!
+// Currently: For 1000 responses, executes 1001 queries (1 for responses + 1000 for answers)
+// Solution: Use single JOIN query or batch fetch answers
+// Example: SELECT r.*, a.* FROM form_responses r LEFT JOIN response_answers a ON r.id = a.response_id WHERE r.form_id = $1
+// Expected improvement: 1000x faster (1001 queries → 1 query)
 func (r *AnalyticsRepository) GetResponseData(ctx context.Context, formID string) ([]calculators.ResponseData, error) {
 	// Get all responses for the form
 	rows, err := r.db.Query(ctx, `
@@ -222,6 +232,11 @@ func (r *AnalyticsRepository) GetResponseData(ctx context.Context, formID string
 }
 
 // EnrichFlowTransitions adds question text to flow transitions
+// TODO: OPTIMIZE - N+1 Query Problem!
+// Currently: Executes ~100+ individual queries for 50 transitions
+// Solution: Fetch all question texts in ONE query using IN clause or JOIN
+// Example: SELECT fc.id, q.question_text FROM flow_connections fc JOIN questions q WHERE fc.id IN (...)
+// Expected improvement: 100x faster (100 queries → 1 query)
 func (r *AnalyticsRepository) EnrichFlowTransitions(ctx context.Context, transitions []calculators.FlowTransition) ([]FlowTransition, error) {
 	if len(transitions) == 0 {
 		return []FlowTransition{}, nil

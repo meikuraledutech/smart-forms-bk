@@ -229,3 +229,14 @@ func connectDB() *pgxpool.Pool {
 		config.MaxConns, config.MinConns)
 	return pool
 }
+
+// TODO: OPTIMIZE - Add Cache Metrics Endpoint
+// Add GET /metrics/cache endpoint to monitor cache performance
+// Should return:
+// - Hit rate (hits / (hits + misses))
+// - Total hits, misses
+// - Current cache size
+// - Memory usage
+// - Most accessed keys
+// Implementation: Use formCache.GetMetrics() from Ristretto
+// Example: app.Get("/metrics/cache", cacheMetricsHandler)

@@ -16,7 +16,7 @@ func NewLinksRepository(db *pgxpool.Pool) *LinksRepository {
 
 // PublishForm updates form to published status with slugs
 func (r *LinksRepository) PublishForm(ctx context.Context, formID, userID, autoSlug string, customSlug *string) error {
-	_, err := r.db.Exec(ctx, `
+	result, err := r.db.Exec(ctx, `
 		UPDATE forms
 		SET status = 'published',
 		    auto_slug = $1,
@@ -26,18 +26,36 @@ func (r *LinksRepository) PublishForm(ctx context.Context, formID, userID, autoS
 		    updated_at = NOW()
 		WHERE id = $3 AND user_id = $4 AND deleted_at IS NULL
 	`, autoSlug, customSlug, formID, userID)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Check if any rows were affected
+	if result.RowsAffected() == 0 {
+		return ErrFormNotFound
+	}
+
+	return nil
 }
 
 // ToggleAcceptingResponses toggles the accepting_responses field
 func (r *LinksRepository) ToggleAcceptingResponses(ctx context.Context, formID, userID string, accepting bool) error {
-	_, err := r.db.Exec(ctx, `
+	result, err := r.db.Exec(ctx, `
 		UPDATE forms
 		SET accepting_responses = $1,
 		    updated_at = NOW()
 		WHERE id = $2 AND user_id = $3 AND deleted_at IS NULL
 	`, accepting, formID, userID)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Check if any rows were affected
+	if result.RowsAffected() == 0 {
+		return ErrFormNotFound
+	}
+
+	return nil
 }
 
 // GetFormBySlug retrieves a published form by auto_slug or custom_slug

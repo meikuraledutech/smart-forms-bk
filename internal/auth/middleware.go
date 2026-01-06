@@ -29,6 +29,24 @@ func JWTAuthMiddleware() fiber.Handler {
 		// 🔑 THIS is what Forms handlers rely on
 		c.Locals("user_id", claims.UserID)
 
+		// Store role (default to 'user' for backwards compatibility with old tokens)
+		role := claims.Role
+		if role == "" {
+			role = "user"
+		}
+		c.Locals("user_role", role)
+
+		return c.Next()
+	}
+}
+
+// RequireSuperAdmin middleware ensures user has super_admin role
+func RequireSuperAdmin() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		role, ok := c.Locals("user_role").(string)
+		if !ok || role != "super_admin" {
+			return fiber.NewError(fiber.StatusForbidden, "Super admin access required")
+		}
 		return c.Next()
 	}
 }

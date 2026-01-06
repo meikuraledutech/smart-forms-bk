@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"os"
 )
 
 /*
@@ -39,42 +40,74 @@ func NewAuthService(repo *AuthRepository) *AuthService {
 ========================
 */
 
+// LoginResponse contains login result
+type LoginResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	User         UserResponse `json:"user"`
+}
+
+// UserResponse contains user info for client
+type UserResponse struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Role     string `json:"role"`
+}
+
 // Login validates credentials and issues tokens
 func (s *AuthService) Login(
 	ctx context.Context,
 	username string,
 	password string,
-) (accessToken string, refreshToken string, err error) {
+) (*LoginResponse, error) {
 
 	user, err := s.repo.GetUserByUsername(ctx, username)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	// Do NOT reveal whether username exists
 	if user == nil {
-		return "", "", ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 
 	if !user.IsActive {
-		return "", "", ErrUserInactive
+		return nil, ErrUserInactive
 	}
 
 	if !VerifyPassword(password, user.PasswordHash) {
-		return "", "", ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 
-	accessToken, err = GenerateAccessToken(user.ID)
+	// Bootstrap super admin from ENV
+	superAdminUsername := os.Getenv("SUPER_ADMIN_USERNAME")
+	if superAdminUsername != "" && username == superAdminUsername && user.Role != "super_admin" {
+		// Promote this user to super admin
+		err = s.repo.UpdateUserRole(ctx, user.ID, "super_admin")
+		if err == nil {
+			user.Role = "super_admin"
+		}
+	}
+
+	accessToken, err := GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
-	refreshToken, err = GenerateRefreshToken(user.ID)
+	refreshToken, err := GenerateRefreshToken(user.ID, user.Role)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
-	return accessToken, refreshToken, nil
+	return &LoginResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		User: UserResponse{
+			ID:       user.ID,
+			Username: user.Username,
+			Role:     user.Role,
+		},
+	}, nil
 }
 
 /*
@@ -99,7 +132,14 @@ func (s *AuthService) RefreshAccessToken(
 	// - Token rotation
 	// - Device/session validation
 
-	return GenerateAccessToken(claims.UserID)
+	// Use role from existing token (avoids DB query)
+	// If role is empty (old token), default to 'user'
+	role := claims.Role
+	if role == "" {
+		role = "user"
+	}
+
+	return GenerateAccessToken(claims.UserID, role)
 }
 
 /*

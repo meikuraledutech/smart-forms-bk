@@ -32,6 +32,7 @@ func getRefreshSecret() []byte {
 // Claims defines JWT payload
 type Claims struct {
 	UserID string `json:"sub"`
+	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -41,18 +42,19 @@ type Claims struct {
 ========================
 */
 
-func GenerateAccessToken(userID string) (string, error) {
-	return generateToken(userID, getAccessSecret(), accessTokenTTL)
+func GenerateAccessToken(userID, role string) (string, error) {
+	return generateToken(userID, role, getAccessSecret(), accessTokenTTL)
 }
 
-func GenerateRefreshToken(userID string) (string, error) {
-	return generateToken(userID, getRefreshSecret(), refreshTokenTTL)
+func GenerateRefreshToken(userID, role string) (string, error) {
+	return generateToken(userID, role, getRefreshSecret(), refreshTokenTTL)
 }
 
 
-func generateToken(userID string, secret []byte, ttl time.Duration) (string, error) {
+func generateToken(userID, role string, secret []byte, ttl time.Duration) (string, error) {
 	claims := Claims{
 		UserID: userID,
+		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

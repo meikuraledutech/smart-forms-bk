@@ -1,6 +1,6 @@
 AUTH MODULE – README
 
-This project implements a simple JWT-based authentication system
+This project implements a JWT-based authentication system with RBAC
 using Go (Fiber), PostgreSQL (Neon), and raw SQL.
 
 FEATURES
@@ -8,10 +8,11 @@ FEATURES
 - Login (JWT access + refresh token)
 - Refresh access token
 - Password hashing using bcrypt
+- Role-Based Access Control (RBAC)
+- Super Admin bootstrap via ENV
 - Raw SQL migrations
 - No ORM
 - UTC-based timestamps
-- Future-ready for Redis, roles, pricing
 
 AUTH ENDPOINTS
 
@@ -43,7 +44,12 @@ Body:
 Response:
 {
   "access_token": "eyJhbGc...",
-  "refresh_token": "eyJhbGc..."
+  "refresh_token": "eyJhbGc...",
+  "user": {
+    "id": "uuid-here",
+    "username": "admin",
+    "role": "super_admin"
+  }
 }
 
 Example:
@@ -69,15 +75,34 @@ curl -X POST http://localhost:3030/auth/refresh \
   -d '{"refresh_token":"eyJhbGc..."}'
 
 TOKEN STRATEGY
-- Access token: short-lived
-- Refresh token: long-lived
+- Access token: short-lived (15 minutes)
+- Refresh token: long-lived (7 days)
 - Refresh token is NOT rotated (static strategy)
 - Login required only when refresh token expires
+- JWT includes role in claims for authorization
+
+ROLE-BASED ACCESS CONTROL (RBAC)
+- Two roles: 'user' (default) and 'super_admin'
+- All new users get 'user' role by default
+- Super admin is auto-promoted via ENV variable
+- JWT middleware injects both user_id and user_role into context
+- RequireSuperAdmin middleware protects admin routes
+
+SUPER ADMIN BOOTSTRAP
+1. Set SUPER_ADMIN_USERNAME in .env
+2. Register user with that username
+3. On first login, user is auto-promoted to super_admin
+4. Super admin has access to:
+   - Manage subscription plans
+   - Manage all users
+   - Create form templates
+   - View all system data
 
 ENV VARIABLES REQUIRED
 - DATABASE_URL
 - ACCESS_TOKEN_SECRET
 - REFRESH_TOKEN_SECRET
+- SUPER_ADMIN_USERNAME (optional, for super admin bootstrap)
 
 MIGRATIONS
 - Raw SQL only
@@ -85,13 +110,32 @@ MIGRATIONS
 - Files:
   migrations/001_create_users.up.sql
   migrations/001_create_users.down.sql
+  migrations/011_add_rbac_fields.up.sql (adds role column)
+  migrations/011_add_rbac_fields.down.sql
+
+MIDDLEWARE
+1. JWTAuthMiddleware()
+   - Validates access token
+   - Injects user_id and user_role into context
+   - Required for all protected routes
+
+2. RequireSuperAdmin()
+   - Checks if user_role == "super_admin"
+   - Returns 403 Forbidden if not super admin
+   - Use after JWTAuthMiddleware()
+
+Example route protection:
+  api := app.Group("/", auth.JWTAuthMiddleware())
+  admin := api.Group("/admin", auth.RequireSuperAdmin())
+  admin.Get("/users", adminHandler.ListUsers)  // Only super admin can access
 
 FUTURE EXTENSIONS (NOT IMPLEMENTED)
 - Redis token blacklist
 - Refresh token rotation
-- Logout
-- Roles and pricing
-- JWT middleware for protected routes
+- Logout endpoint
+- Payment integration with Razorpay
+- Subscription management
 
 STATUS
-Auth core is complete and working.
+Auth with RBAC is complete and working.
+Ready for payment integration and subscription features.

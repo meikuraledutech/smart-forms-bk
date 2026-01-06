@@ -14,6 +14,7 @@ type User struct {
 	Username     string
 	PasswordHash string
 	IsActive     bool
+	Role         string // 'user' or 'super_admin'
 }
 
 // AuthRepository handles raw SQL for auth
@@ -57,7 +58,7 @@ func (r *AuthRepository) GetUserByUsername(
 ) (*User, error) {
 
 	const query = `
-		SELECT id, username, password_hash, is_active
+		SELECT id, username, password_hash, is_active, role
 		FROM users
 		WHERE username = $1
 	`
@@ -70,6 +71,7 @@ func (r *AuthRepository) GetUserByUsername(
 		&user.Username,
 		&user.PasswordHash,
 		&user.IsActive,
+		&user.Role,
 	)
 
 	if err != nil {
@@ -80,4 +82,25 @@ func (r *AuthRepository) GetUserByUsername(
 	}
 
 	return &user, nil
+}
+
+/*
+========================
+ UPDATE USER ROLE
+========================
+*/
+func (r *AuthRepository) UpdateUserRole(
+	ctx context.Context,
+	userID string,
+	role string,
+) error {
+
+	const query = `
+		UPDATE users
+		SET role = $1, updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+		WHERE id = $2
+	`
+
+	_, err := r.db.Exec(ctx, query, role, userID)
+	return err
 }

@@ -23,18 +23,13 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-type loginResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-}
-
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var req loginRequest
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.ErrBadRequest
 	}
 
-	access, refresh, err := h.service.Login(
+	response, err := h.service.Login(
 		c.Context(),
 		req.Username,
 		req.Password,
@@ -43,10 +38,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return fiber.ErrUnauthorized
 	}
 
-	return c.JSON(loginResponse{
-		AccessToken:  access,
-		RefreshToken: refresh,
-	})
+	return c.JSON(response)
 }
 
 /*

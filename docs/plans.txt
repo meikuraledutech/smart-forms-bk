@@ -1,0 +1,514 @@
+PLANS MODULE – README
+
+This module manages subscription pricing plans for the Smart Forms application.
+Super admin can create, update, and manage plans. Users can view active plans.
+
+FEATURES
+- Create/Update/Delete pricing plans (super admin only)
+- Public pricing endpoint for users
+- Automatic feature assignment based on plan type
+- Soft delete (plans marked inactive, not removed)
+- RBAC protection (RequireSuperAdmin middleware)
+- Support for Free, Monthly, and Yearly plans
+
+PRICING STRUCTURE (Current)
+- Free Plan: Unlimited forms, 7-day data retention, no export
+- Pro Monthly: Unlimited forms, unlimited retention, CSV export, full analytics
+- Pro Yearly: Same as monthly with annual billing discount
+
+PLAN API ENDPOINTS
+
+1. Public - View Active Plans (No Auth Required)
+GET /plans
+
+Response:
+{
+  "plans": [
+    {
+      "id": "uuid-here",
+      "name": "Free",
+      "plan_type": "free",
+      "price_inr": 0,
+      "features": {
+        "data_retention_days": 7,
+        "can_export": false,
+        "full_analytics": false
+      },
+      "is_active": true,
+      "created_at": "2026-01-06T18:22:15Z",
+      "updated_at": "2026-01-06T18:22:15Z"
+    },
+    {
+      "id": "uuid-here",
+      "name": "Pro Monthly",
+      "plan_type": "monthly",
+      "price_inr": 39900,
+      "features": {
+        "data_retention_days": 0,
+        "can_export": true,
+        "full_analytics": true
+      },
+      "is_active": true,
+      "created_at": "2026-01-07T17:57:36Z",
+      "updated_at": "2026-01-07T17:57:36Z"
+    }
+  ]
+}
+
+Example:
+curl http://localhost:3030/plans
+
+Notes:
+- Shows only active plans (is_active = true)
+- Sorted by price (ascending)
+- No authentication required
+- Used for public pricing page
+
+
+2. Admin - List All Plans (Super Admin Only)
+GET /admin/plans
+
+Headers:
+Authorization: Bearer {access_token}
+
+Response:
+{
+  "plans": [
+    // Array of all plans including inactive ones
+  ]
+}
+
+Example:
+curl http://localhost:3030/admin/plans \
+  -H "Authorization: Bearer eyJhbGc..."
+
+Notes:
+- Shows ALL plans (active + inactive)
+- Requires super_admin role
+- Returns 403 if not super admin
+
+
+3. Admin - Get Single Plan (Super Admin Only)
+GET /admin/plans/:id
+
+Headers:
+Authorization: Bearer {access_token}
+
+Response:
+{
+  "id": "uuid-here",
+  "name": "Pro Monthly",
+  "plan_type": "monthly",
+  "price_inr": 39900,
+  "features": {...},
+  "is_active": true,
+  "created_at": "...",
+  "updated_at": "..."
+}
+
+Example:
+curl http://localhost:3030/admin/plans/8cb3be96-8764-443e-863a-5cb58bba0c8b \
+  -H "Authorization: Bearer eyJhbGc..."
+
+
+4. Admin - Create Plan (Super Admin Only)
+POST /admin/plans
+
+Headers:
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+Body:
+{
+  "name": "Pro Monthly",
+  "plan_type": "monthly",
+  "price_inr": 39900,
+  "razorpay_plan_id": "plan_xxxxx",  // Optional
+  "features": {
+    "data_retention_days": 0,
+    "can_export": true,
+    "full_analytics": true
+  }
+}
+
+Response:
+{
+  "id": "uuid-generated",
+  "name": "Pro Monthly",
+  "plan_type": "monthly",
+  "price_inr": 39900,
+  "razorpay_plan_id": "plan_xxxxx",
+  "features": {
+    "data_retention_days": 0,
+    "can_export": true,
+    "full_analytics": true
+  },
+  "is_active": true,
+  "created_at": "2026-01-07T17:57:36Z",
+  "updated_at": "2026-01-07T17:57:36Z"
+}
+
+Example:
+curl -X POST http://localhost:3030/admin/plans \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGc..." \
+  -d '{
+    "name": "Pro Monthly",
+    "plan_type": "monthly",
+    "price_inr": 39900
+  }'
+
+Notes:
+- plan_type must be: "free", "monthly", or "yearly"
+- price_inr is in paise (100 paise = 1 INR)
+  Example: 39900 = ₹399
+- Features are auto-assigned if not provided:
+  * free → {data_retention_days: 7, can_export: false, full_analytics: false}
+  * monthly/yearly → {data_retention_days: 0, can_export: true, full_analytics: true}
+- razorpay_plan_id is optional (for payment integration)
+
+
+5. Admin - Update Plan (Super Admin Only)
+PATCH /admin/plans/:id
+
+Headers:
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+Body (all fields optional):
+{
+  "name": "Pro Monthly Updated",
+  "price_inr": 34900,
+  "razorpay_plan_id": "plan_new_id",
+  "features": {
+    "data_retention_days": 0,
+    "can_export": true,
+    "full_analytics": true,
+    "priority_support": true
+  },
+  "is_active": true
+}
+
+Response:
+{
+  "id": "same-uuid",
+  "name": "Pro Monthly Updated",
+  "price_inr": 34900,
+  "features": {...},
+  "updated_at": "2026-01-07T18:10:00Z"
+}
+
+Example:
+curl -X PATCH http://localhost:3030/admin/plans/8cb3be96-8764-443e-863a-5cb58bba0c8b \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGc..." \
+  -d '{"price_inr": 34900}'
+
+Notes:
+- Only provide fields you want to update
+- Price changes affect new subscriptions only (existing users keep their price)
+- updated_at timestamp is automatically updated
+
+
+6. Admin - Delete Plan (Super Admin Only)
+DELETE /admin/plans/:id
+
+Headers:
+Authorization: Bearer {access_token}
+
+Response:
+{
+  "message": "Plan deleted successfully"
+}
+
+Example:
+curl -X DELETE http://localhost:3030/admin/plans/8cb3be96-8764-443e-863a-5cb58bba0c8b \
+  -H "Authorization: Bearer eyJhbGc..."
+
+Notes:
+- This is a SOFT DELETE (plan marked as inactive, not removed)
+- Plan is set to is_active = false
+- Admin can still see inactive plans in GET /admin/plans
+- Public endpoint will NOT show inactive plans
+- Existing users on this plan are NOT affected
+
+
+PLAN STRUCTURE
+
+Database Table: subscription_plans
+
+Columns:
+- id: UUID (primary key)
+- name: TEXT (e.g., "Pro Monthly", "Pro Yearly")
+- plan_type: TEXT ('free', 'monthly', 'yearly')
+- price_inr: INTEGER (price in paise, e.g., 39900 = ₹399)
+- razorpay_plan_id: TEXT (nullable, for Razorpay integration)
+- features: JSONB (plan features as JSON)
+- is_active: BOOLEAN (true = visible to users, false = deleted)
+- created_at: TIMESTAMPTZ
+- updated_at: TIMESTAMPTZ
+
+Indexes:
+- Primary key on id
+- No unique constraints on name (allows duplicates)
+
+Seeded Data:
+- Free plan is automatically created by migration 011
+
+
+FEATURES JSON STRUCTURE
+
+Standard Features (Recommended):
+{
+  "data_retention_days": 0,        // 0 = unlimited, 7 = 7 days
+  "can_export": true,               // CSV export enabled
+  "full_analytics": true            // Full analytics access
+}
+
+Custom Features (Examples):
+{
+  "data_retention_days": 0,
+  "can_export": true,
+  "full_analytics": true,
+  "max_forms_per_month": 300,      // Form creation limit
+  "custom_branding": true,          // White-label
+  "priority_support": true,         // Priority support
+  "api_access": true,               // API access
+  "dedicated_support": true         // Dedicated account manager
+}
+
+Feature Naming Convention:
+- Use snake_case for keys
+- Boolean values for yes/no features
+- Numbers for limits (0 = unlimited)
+- Keep it simple and readable
+
+
+PRICING EXAMPLES
+
+Free Plan:
+- price_inr: 0
+- data_retention_days: 7
+- can_export: false
+- full_analytics: false
+
+Pro Monthly (₹399/month):
+- price_inr: 39900
+- data_retention_days: 0 (unlimited)
+- can_export: true
+- full_analytics: true
+
+Pro Yearly (₹4,799/year):
+- price_inr: 479900
+- data_retention_days: 0
+- can_export: true
+- full_analytics: true
+- Yearly discount: ₹5,988 - ₹4,799 = ₹1,189 saved
+
+
+PRICE CONVERSION
+
+INR to Paise:
+₹1 = 100 paise
+₹399 = 39900 paise
+₹4,799 = 479900 paise
+
+Formula:
+paise = rupees × 100
+rupees = paise / 100
+
+
+BUSINESS RULES
+
+1. Free Plan:
+   - Cannot be deleted (always available)
+   - All new users start with Free plan
+   - Data older than 7 days is hidden (not deleted)
+
+2. Paid Plans (Pro):
+   - Unlimited data retention
+   - CSV export enabled
+   - Full analytics enabled
+
+3. Plan Changes:
+   - Price updates affect new subscriptions only
+   - Existing users keep their original price (grandfathering)
+   - Features can be updated anytime
+
+4. Soft Delete:
+   - Deleted plans are marked inactive
+   - Existing users on deleted plans are unaffected
+   - New users cannot subscribe to deleted plans
+
+
+RBAC (Role-Based Access Control)
+
+Public Access:
+- GET /plans (view active plans)
+
+User Access (authenticated):
+- Can view their own subscription status (future)
+- Can subscribe to plans (future)
+
+Super Admin Access:
+- Full CRUD on plans
+- View all plans (active + inactive)
+- Change plan pricing
+- Activate/deactivate plans
+
+Protection:
+- All /admin/* routes require super_admin role
+- Regular users get "Super admin access required" error
+- Enforced by RequireSuperAdmin() middleware
+
+
+ERROR RESPONSES
+
+404 Not Found:
+{
+  "message": "Not Found"
+}
+- Plan ID doesn't exist
+
+400 Bad Request:
+{
+  "message": "Bad Request"
+}
+- Invalid plan_type
+- Missing required fields
+- Invalid JSON
+
+403 Forbidden:
+{
+  "message": "Super admin access required"
+}
+- User is not super admin
+
+409 Conflict:
+{
+  "message": "Plan with this name already exists"
+}
+- Plan name must be unique (currently not enforced)
+
+500 Internal Server Error:
+{
+  "message": "Internal Server Error"
+}
+- Database error
+- Server error
+
+
+COMMON USE CASES
+
+Use Case 1: Setup Initial Pricing
+1. Super admin creates Pro Monthly plan (₹399)
+2. Super admin creates Pro Yearly plan (₹4,799)
+3. Users see 3 plans: Free, Pro Monthly, Pro Yearly
+
+Use Case 2: Price Experiment (A/B Testing)
+1. Create "Pro Monthly A" at ₹399
+2. Create "Pro Monthly B" at ₹499
+3. Track conversions to find optimal price
+4. Delete losing variant
+5. Keep winner as main plan
+
+Use Case 3: Limited Time Discount
+1. Update Pro Monthly: ₹399 → ₹349
+2. Run promotion for 1 month
+3. Update back: ₹349 → ₹399
+4. Existing users keep ₹349 (grandfathering)
+
+Use Case 4: New Plan Launch
+1. Create "Enterprise" plan
+2. Set high price or custom pricing
+3. Mark as inactive initially
+4. Activate when ready to sell
+
+Use Case 5: Sunset Old Plan
+1. Delete "Pro Monthly Old"
+2. Plan becomes inactive
+3. Existing users keep using it
+4. New users cannot subscribe
+5. Create new "Pro Monthly New" plan
+
+
+TESTING
+
+Test Plan Creation:
+curl -X POST http://localhost:3030/admin/plans \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {token}" \
+  -d '{
+    "name": "Test Plan",
+    "plan_type": "monthly",
+    "price_inr": 9900
+  }'
+
+Test RBAC Protection:
+# Login as regular user
+TOKEN=$(curl -s -X POST http://localhost:3030/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password"}' \
+  | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+
+# Try to access admin endpoint (should fail)
+curl http://localhost:3030/admin/plans \
+  -H "Authorization: Bearer $TOKEN"
+# Expected: "Super admin access required"
+
+Test Public Endpoint:
+curl http://localhost:3030/plans
+# Expected: List of active plans, no auth required
+
+
+FUTURE ENHANCEMENTS (Not Yet Implemented)
+
+1. Pricing History Tracking
+   - Track every price change
+   - Analyze conversion rates by price
+   - Find optimal pricing
+
+2. Razorpay Integration
+   - Create subscriptions
+   - Handle webhooks
+   - Automatic plan assignment
+
+3. User Subscriptions
+   - Link users to plans
+   - Billing cycle management
+   - Automatic renewals
+
+4. Feature Gating
+   - Check user's plan before export
+   - Apply data retention based on plan
+   - Show/hide features by plan
+
+5. Discount System
+   - Promo codes
+   - Limited-time offers
+   - Percentage discounts
+   - Referral discounts
+
+6. Analytics Dashboard
+   - Revenue by plan
+   - Conversion rates
+   - Popular plans
+   - Churn analysis
+
+
+MIGRATIONS
+
+011_add_rbac_fields.up.sql:
+- Creates subscription_plans table
+- Seeds Free plan
+- Adds role column to users
+
+011_add_rbac_fields.down.sql:
+- Drops subscription_plans table
+- Removes role column
+
+
+STATUS
+
+Plans module is COMPLETE and WORKING.
+Ready for Razorpay payment integration.

@@ -13,6 +13,7 @@ import (
 	"smart-forms/internal/forms"
 	"smart-forms/internal/links"
 	"smart-forms/internal/migrations"
+	"smart-forms/internal/plans"
 	"smart-forms/internal/questions"
 	"smart-forms/internal/responses"
 	"smart-forms/internal/responses/buffer"
@@ -120,9 +121,14 @@ func main() {
 	analyticsService := analytics.NewAnalyticsService(analyticsRepo)
 	analyticsHandler := analytics.NewAnalyticsHandler(analyticsService)
 
+	plansRepo := plans.NewPlansRepository(db)
+	plansService := plans.NewPlansService(plansRepo)
+	plansHandler := plans.NewPlansHandler(plansService)
+
 	// Public routes (no auth) - MUST be before protected group
 	app.Get("/f/:slug", linksHandler.GetPublicForm)
 	app.Post("/f/:slug/responses", responsesHandler.SubmitResponse)
+	app.Get("/plans", plansHandler.ListActivePlans) // Public pricing page
 
 	// Protect routes
 	api := app.Group("/", auth.JWTAuthMiddleware())
@@ -157,6 +163,16 @@ func main() {
 	api.Get("/forms/:form_id/analytics/status", analyticsHandler.GetAnalyticsStatus)
 	api.Get("/forms/:form_id/analytics/nodes", analyticsHandler.GetNodeAnalytics)
 	api.Get("/forms/:form_id/analytics/flow", analyticsHandler.GetFlowAnalytics)
+
+	// Super Admin routes (requires super_admin role)
+	admin := api.Group("/admin", auth.RequireSuperAdmin())
+
+	// Plans management (super admin only)
+	admin.Get("/plans", plansHandler.ListAllPlans)
+	admin.Post("/plans", plansHandler.CreatePlan)
+	admin.Get("/plans/:id", plansHandler.GetPlan)
+	admin.Patch("/plans/:id", plansHandler.UpdatePlan)
+	admin.Delete("/plans/:id", plansHandler.DeletePlan)
 
 	port := os.Getenv("PORT")
 	if port == "" {

@@ -2,8 +2,12 @@ package forms
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
+	"time"
 
 	"smart-forms/internal/cache"
 )
@@ -115,6 +119,10 @@ func (s *FormsService) Update(
 	// Get slugs before update (for cache invalidation)
 	autoSlug, customSlug, _ := s.repo.GetFormSlugs(ctx, formID)
 
+	// Check if this is a template before update
+	existingForm, _ := s.repo.GetByID(ctx, userID, formID)
+	isTemplate := existingForm != nil && existingForm.IsTemplate
+
 	// Update in database
 	err := s.repo.Update(ctx, userID, formID, title, description, status)
 	if err != nil {
@@ -131,6 +139,11 @@ func (s *FormsService) Update(
 	}
 	if customSlug != nil && *customSlug != "" {
 		s.cache.Delete(cache.FormSlugKey(*customSlug))
+	}
+
+	// If this is a template, invalidate templates list cache
+	if isTemplate {
+		s.InvalidateTemplatesCache()
 	}
 
 	return nil
@@ -150,6 +163,10 @@ func (s *FormsService) SoftDelete(
 	// Get slugs before delete (for cache invalidation)
 	autoSlug, customSlug, _ := s.repo.GetFormSlugs(ctx, formID)
 
+	// Check if this is a template before delete
+	existingForm, _ := s.repo.GetByID(ctx, userID, formID)
+	isTemplate := existingForm != nil && existingForm.IsTemplate
+
 	// Delete from database
 	err := s.repo.SoftDelete(ctx, userID, formID)
 	if err != nil {
@@ -166,6 +183,11 @@ func (s *FormsService) SoftDelete(
 	}
 	if customSlug != nil && *customSlug != "" {
 		s.cache.Delete(cache.FormSlugKey(*customSlug))
+	}
+
+	// If this was a template, invalidate templates list cache
+	if isTemplate {
+		s.InvalidateTemplatesCache()
 	}
 
 	return nil
@@ -197,14 +219,61 @@ func (s *FormsService) ToggleTemplate(
 	formID string,
 	isTemplate bool,
 ) error {
-	return s.repo.ToggleTemplate(ctx, formID, isTemplate)
+	err := s.repo.ToggleTemplate(ctx, formID, isTemplate)
+	if err != nil {
+		return err
+	}
+
+	// Invalidate templates cache
+	s.InvalidateTemplatesCache()
+
+	return nil
 }
 
 // ListTemplates lists all published templates (public)
 func (s *FormsService) ListTemplates(
 	ctx context.Context,
 ) ([]Form, error) {
-	return s.repo.ListTemplates(ctx)
+	// Try cache first
+	cacheKey := "templates:list"
+	if cached, found := s.cache.Get(cacheKey); found {
+		if templates, ok := cached.([]Form); ok {
+			return templates, nil
+		}
+	}
+
+	// Cache miss - fetch from database
+	templates, err := s.repo.ListTemplates(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache for 7 days
+	s.cache.Set(cacheKey, templates, 7*24*time.Hour)
+
+	return templates, nil
+}
+
+// GenerateTemplatesETag generates an ETag for templates list
+func (s *FormsService) GenerateTemplatesETag(templates []Form) string {
+	// Create a hash based on template count, IDs and updated_at timestamps
+	// This ensures ETag changes whenever templates are added/removed/modified
+	type etagData struct {
+		Count     int
+		Templates []Form
+	}
+
+	data, _ := json.Marshal(etagData{
+		Count:     len(templates),
+		Templates: templates,
+	})
+	hash := sha256.Sum256(data)
+	return fmt.Sprintf(`W/"%x"`, hash[:16]) // Weak ETag with first 16 bytes for better uniqueness
+}
+
+// InvalidateTemplatesCache invalidates the templates list cache
+func (s *FormsService) InvalidateTemplatesCache() {
+	s.cache.Delete("templates:list")
 }
 
 // GetTemplateData gets template data for cloning

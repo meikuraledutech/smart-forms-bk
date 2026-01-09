@@ -213,9 +213,29 @@ func (h *FormsHandler) ToggleTemplate(c *fiber.Ctx) error {
 // ListTemplates lists all published templates (public)
 // GET /templates
 func (h *FormsHandler) ListTemplates(c *fiber.Ctx) error {
+	// Get templates from cache or database
 	templates, err := h.service.ListTemplates(c.Context())
 	if err != nil {
 		return fiber.ErrInternalServerError
+	}
+
+	// Generate ETag based on templates data
+	etag := h.service.GenerateTemplatesETag(templates)
+
+	// Check If-None-Match header
+	if match := c.Get("If-None-Match"); match == etag {
+		return c.SendStatus(fiber.StatusNotModified)
+	}
+
+	// Set caching headers - always revalidate with ETag
+	// Browser MUST check server on every request but can use cached version if ETag matches
+	c.Set("ETag", etag)
+	c.Set("Cache-Control", "no-cache") // Always revalidate, but use cached version if ETag matches
+	c.Set("Vary", "Accept-Encoding")
+
+	// Set Last-Modified header if templates exist
+	if len(templates) > 0 {
+		c.Set("Last-Modified", templates[0].UpdatedAt.UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
 	}
 
 	return c.JSON(fiber.Map{

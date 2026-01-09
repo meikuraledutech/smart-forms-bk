@@ -70,7 +70,7 @@ func (r *FormsRepository) GetByID(
 ) (*Form, error) {
 
 	const query = `
-		SELECT id, title, description, status, auto_slug, custom_slug, accepting_responses, published_at, created_at, updated_at
+		SELECT id, title, description, status, auto_slug, custom_slug, accepting_responses, published_at, is_template, created_at, updated_at
 		FROM forms
 		WHERE
 			id = $1
@@ -93,6 +93,7 @@ func (r *FormsRepository) GetByID(
 		&f.CustomSlug,
 		&f.AcceptingResponses,
 		&f.PublishedAt,
+		&f.IsTemplate,
 		&f.CreatedAt,
 		&f.UpdatedAt,
 	)
@@ -134,7 +135,7 @@ func (r *FormsRepository) List(
 	if search == "" {
 		// -------- NO SEARCH --------
 		listQuery := `
-			SELECT id, title, description, status, auto_slug, custom_slug, accepting_responses, published_at, created_at, updated_at
+			SELECT id, title, description, status, auto_slug, custom_slug, accepting_responses, published_at, is_template, created_at, updated_at
 			FROM forms
 			WHERE user_id = $1
 			  AND deleted_at IS NULL
@@ -163,7 +164,7 @@ func (r *FormsRepository) List(
 	} else {
 		// -------- WITH SEARCH --------
 		listQuery := `
-			SELECT id, title, description, status, auto_slug, custom_slug, accepting_responses, published_at, created_at, updated_at
+			SELECT id, title, description, status, auto_slug, custom_slug, accepting_responses, published_at, is_template, created_at, updated_at
 			FROM forms
 			WHERE user_id = $1
 			  AND deleted_at IS NULL
@@ -203,6 +204,7 @@ func (r *FormsRepository) List(
 			&f.CustomSlug,
 			&f.AcceptingResponses,
 			&f.PublishedAt,
+			&f.IsTemplate,
 			&f.CreatedAt,
 			&f.UpdatedAt,
 		); err != nil {
@@ -325,4 +327,107 @@ func (r *FormsRepository) GetFormSlugs(
 	}
 
 	return autoSlug, customSlug, nil
+}
+
+/*
+========================
+ TEMPLATE OPERATIONS
+========================
+*/
+
+// ToggleTemplate toggles is_template flag (super admin only)
+func (r *FormsRepository) ToggleTemplate(
+	ctx context.Context,
+	formID string,
+	isTemplate bool,
+) error {
+	const query = `
+		UPDATE forms
+		SET
+			is_template = $1,
+			updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+		WHERE
+			id = $2
+			AND deleted_at IS NULL
+			AND status = 'published'
+	`
+
+	cmd, err := r.db.Exec(ctx, query, isTemplate, formID)
+	if err != nil {
+		return err
+	}
+
+	if cmd.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+// ListTemplates lists all published templates (public)
+func (r *FormsRepository) ListTemplates(
+	ctx context.Context,
+) ([]Form, error) {
+	const query = `
+		SELECT id, title, description, status, is_template, created_at, updated_at
+		FROM forms
+		WHERE is_template = true
+		  AND deleted_at IS NULL
+		  AND status = 'published'
+		ORDER BY updated_at DESC
+	`
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var forms []Form
+	for rows.Next() {
+		var f Form
+		if err := rows.Scan(
+			&f.ID,
+			&f.Title,
+			&f.Description,
+			&f.Status,
+			&f.IsTemplate,
+			&f.CreatedAt,
+			&f.UpdatedAt,
+		); err != nil {
+			continue
+		}
+		forms = append(forms, f)
+	}
+
+	return forms, nil
+}
+
+// GetTemplateWithFlow returns template metadata (for cloning)
+func (r *FormsRepository) GetTemplateWithFlow(
+	ctx context.Context,
+	templateID string,
+) (*Form, error) {
+	const query = `
+		SELECT id, title, description, status, is_template, created_at, updated_at
+		FROM forms
+		WHERE id = $1 AND is_template = true AND status = 'published' AND deleted_at IS NULL
+	`
+
+	var f Form
+	err := r.db.QueryRow(ctx, query, templateID).Scan(
+		&f.ID,
+		&f.Title,
+		&f.Description,
+		&f.Status,
+		&f.IsTemplate,
+		&f.CreatedAt,
+		&f.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, ErrNotFound
+	}
+
+	return &f, nil
 }

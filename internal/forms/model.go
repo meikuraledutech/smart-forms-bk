@@ -13,6 +13,7 @@ type Form struct {
 	CustomSlug         *string    `json:"custom_slug,omitempty"`
 	AcceptingResponses bool       `json:"accepting_responses"`
 	PublishedAt        *time.Time `json:"published_at,omitempty"`
+	IsTemplate         bool       `json:"is_template"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 	DeletedAt          *time.Time `json:"-"`

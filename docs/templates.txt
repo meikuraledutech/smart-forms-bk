@@ -1,0 +1,459 @@
+================================================================================
+TEMPLATES FEATURE - SMART FORMS
+================================================================================
+
+OVERVIEW
+--------
+The Templates feature allows super admins to create reusable form templates that
+regular users can clone and customize. This is a simplified, backend-driven
+implementation that reuses existing form and flow creation logic.
+
+Key Features:
+- Super admins can mark published forms as templates
+- Templates are publicly visible in a template gallery
+- Authenticated users can clone templates to their account
+- Cloning copies both form metadata and flow structure
+- Simple implementation using existing APIs internally
+
+================================================================================
+ARCHITECTURE
+================================================================================
+
+Database Schema:
+---------------
+- Added `is_template` boolean field to `forms` table
+- Added index on `is_template` for efficient template queries
+- No separate tables needed (simple approach)
+
+Flow:
+-----
+1. Super admin creates a form normally
+2. Super admin publishes the form (required)
+3. Super admin toggles is_template flag to true
+4. Template appears in public gallery
+5. Users clone templates (backend creates new form + copies flow)
+
+Implementation Strategy:
+-----------------------
+Instead of complex database transactions, the clone endpoint uses existing
+service methods:
+  1. Get template metadata from repository
+  2. Get template flow structure using existing flow methods
+  3. Create new form using existing form creation service
+  4. Recreate flow using existing flow creation logic
+
+This approach:
+- Reuses tested code
+- Simpler to maintain
+- No complex SQL transactions
+- Type-safe with existing models
+
+================================================================================
+API ENDPOINTS
+================================================================================
+
+1. LIST TEMPLATES (Public)
+---------------------------
+GET /templates
+
+Description: Returns all published templates (public access, no auth required)
+
+Response: 200 OK
+{
+  "templates": [
+    {
+      "id": "uuid",
+      "title": "Event Registration Template",
+      "description": "Template for event registrations",
+      "status": "published",
+      "is_template": true,
+      "created_at": "2026-01-08T13:57:42Z",
+      "updated_at": "2026-01-08T14:00:05Z"
+    }
+  ],
+  "total": 1
+}
+
+Example:
+curl http://localhost:3030/templates
+
+
+2. TOGGLE TEMPLATE STATUS (Super Admin Only)
+---------------------------------------------
+PATCH /admin/forms/:id/template
+
+Description: Toggle a form's template status (super admin only)
+
+Requirements:
+- Must be super admin
+- Form must be published
+- Form must not be deleted
+
+Request Body:
+{
+  "is_template": true
+}
+
+Response: 200 OK
+{
+  "message": "Template status updated",
+  "is_template": true
+}
+
+Error Responses:
+- 401 Unauthorized: Not logged in or not super admin
+- 404 Not Found: Form not found or not published
+- 400 Bad Request: Invalid input
+
+Example:
+curl -X PATCH http://localhost:3030/admin/forms/FORM_ID/template \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"is_template": true}'
+
+
+3. CLONE TEMPLATE (Authenticated)
+----------------------------------
+POST /templates/:id/clone
+
+Description: Clone a template to user's account (authenticated users only)
+
+Process:
+1. Verifies template exists and is published
+2. Creates new form with "Copy of {template_title}"
+3. Copies flow structure (questions + connections)
+4. Returns new form as draft status
+
+Response: 201 Created
+{
+  "message": "Template cloned successfully",
+  "form": {
+    "id": "new-uuid",
+    "title": "Copy of Event Registration Template",
+    "description": "Template for event registrations",
+    "status": "draft",
+    "accepting_responses": false,
+    "is_template": false,
+    "created_at": "2026-01-09T09:45:25Z",
+    "updated_at": "2026-01-09T09:45:25Z"
+  }
+}
+
+Error Responses:
+- 401 Unauthorized: Not logged in
+- 404 Not Found: Template not found or not published
+- 500 Internal Server Error: Failed to clone
+
+Example:
+curl -X POST http://localhost:3030/templates/TEMPLATE_ID/clone \
+  -H "Authorization: Bearer $USER_TOKEN"
+
+
+================================================================================
+WORKFLOW EXAMPLES
+================================================================================
+
+WORKFLOW 1: Super Admin Creates Template
+-----------------------------------------
+1. Super admin creates a form normally:
+   POST /forms
+   {
+     "title": "Event Registration Template",
+     "description": "Template for event registrations"
+   }
+
+2. Super admin adds questions and flow:
+   PATCH /forms/:form_id/flow
+   {
+     "blocks": [
+       {
+         "id": "q1",
+         "type": "question",
+         "question": "What is your full name?",
+         "children": [...]
+       }
+     ]
+   }
+
+3. Super admin publishes the form:
+   PATCH /forms/:form_id/publish
+
+4. Super admin marks it as template:
+   PATCH /admin/forms/:form_id/template
+   {"is_template": true}
+
+5. Template now appears in public gallery:
+   GET /templates
+
+
+WORKFLOW 2: User Clones Template
+---------------------------------
+1. User browses public template gallery:
+   GET /templates
+
+2. User selects a template and clones it:
+   POST /templates/:template_id/clone
+
+3. Backend creates new form and copies flow structure
+
+4. User receives new form in draft status
+
+5. User can now customize the cloned form:
+   PATCH /forms/:new_form_id
+   {
+     "title": "My Custom Event Registration",
+     "description": "Modified version"
+   }
+
+6. User can modify the flow if needed:
+   PATCH /forms/:new_form_id/flow
+
+7. User publishes when ready:
+   PATCH /forms/:new_form_id/publish
+
+
+================================================================================
+CODE STRUCTURE
+================================================================================
+
+Files Modified/Created:
+-----------------------
+1. migrations/013_add_templates.up.sql
+   - Adds is_template boolean column
+   - Adds index for performance
+
+2. internal/forms/model.go
+   - Added IsTemplate bool field
+
+3. internal/forms/repository.go
+   - ToggleTemplate() - Toggle template status
+   - ListTemplates() - Get all published templates
+   - GetTemplateWithFlow() - Get template metadata for cloning
+
+4. internal/forms/service.go
+   - ToggleTemplate() - Service method
+   - ListTemplates() - Service method
+   - GetTemplateData() - Service method for cloning
+
+5. internal/forms/handler.go
+   - ToggleTemplate() - Handler
+   - ListTemplates() - Handler
+   - CloneTemplate() - Handler (uses flow repo for copying)
+   - buildTree() - Helper to build flow tree structure
+   - processBlock() - Helper to recursively create flow connections
+
+6. main.go
+   - Added public route: GET /templates
+   - Added admin route: PATCH /admin/forms/:id/template
+   - Added protected route: POST /templates/:id/clone
+   - Added flowRepoAdapter for dependency injection
+
+
+================================================================================
+IMPLEMENTATION DETAILS
+================================================================================
+
+Clone Implementation:
+--------------------
+The CloneTemplate handler follows this simple approach:
+
+1. Get template metadata:
+   template := service.GetTemplateData(ctx, templateID)
+
+2. Get template flow structure:
+   flowItems := flowRepo.GetFlowWithQuestions(ctx, templateID)
+
+3. Create new form:
+   newForm := service.Create(ctx, userID, "Copy of " + template.Title, ...)
+
+4. Build tree from flat flow items:
+   blocks := buildTree(flowItems, nil)
+
+5. Recreate flow in new form:
+   for each block:
+     - Find or create question
+     - Create flow connection
+     - Recursively process children
+
+This approach:
+- Avoids complex SQL with transactions
+- Reuses existing tested code paths
+- Type-safe with existing models
+- Easy to debug and maintain
+
+
+Security Considerations:
+-----------------------
+1. Template Toggle: Only super_admin role can mark forms as templates
+2. Template Publishing: Only published forms can be marked as templates
+3. Template Cloning: Any authenticated user can clone (normal user permissions)
+4. Template Gallery: Public access (no sensitive data exposed)
+5. Ownership: Cloned forms belong to the cloning user
+
+
+Performance:
+-----------
+1. Index on is_template for fast template listing
+2. Query only published templates (status filter)
+3. Clone operation reuses question deduplication logic
+4. No complex joins in clone operation
+
+
+================================================================================
+TESTING
+================================================================================
+
+Manual Testing Commands:
+-----------------------
+
+1. Login as super admin:
+curl -X POST http://localhost:3030/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@smart-forms.in","password":"admin123"}'
+
+2. Create a form:
+curl -X POST http://localhost:3030/forms \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"My Template","description":"Test template"}'
+
+3. Add flow to the form:
+curl -X PATCH http://localhost:3030/forms/FORM_ID/flow \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "blocks": [
+      {
+        "id": "q1",
+        "type": "question",
+        "question": "What is your name?",
+        "children": []
+      }
+    ]
+  }'
+
+4. Publish the form:
+curl -X PATCH http://localhost:3030/forms/FORM_ID \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"My Template","description":"Test","status":"published"}'
+
+5. Toggle template:
+curl -X PATCH http://localhost:3030/admin/forms/FORM_ID/template \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"is_template":true}'
+
+6. List templates (public):
+curl http://localhost:3030/templates
+
+7. Clone template:
+curl -X POST http://localhost:3030/templates/TEMPLATE_ID/clone \
+  -H "Authorization: Bearer $USER_TOKEN"
+
+8. Verify cloned form has flow:
+curl http://localhost:3030/forms/CLONED_FORM_ID/flow \
+  -H "Authorization: Bearer $USER_TOKEN"
+
+
+Test Results (Verified):
+------------------------
+✅ List Templates - Returns all published templates
+✅ Toggle Template - Super admin can mark forms as templates
+✅ Clone Template - Creates new form with identical flow structure
+✅ Flow Copy - Both questions and flow connections copied correctly
+✅ Ownership - Cloned form belongs to cloning user
+✅ Permissions - Only super admin can toggle template status
+
+
+================================================================================
+FUTURE ENHANCEMENTS
+================================================================================
+
+Possible Future Features (Not Currently Implemented):
+-----------------------------------------------------
+1. Template Categories (e.g., Business, Education, Events)
+2. Template Tags for better searching
+3. Template Preview (with sample data)
+4. Template Popularity/Usage Statistics
+5. Template Ratings/Reviews
+6. Featured Templates
+7. Template Search/Filter by category, tags, etc.
+8. Template Version History
+9. Template Sharing Between Organizations
+10. Custom Template Permissions
+
+Note: Current implementation is intentionally simple and focused on core
+functionality. Additional features can be added incrementally based on user needs.
+
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Common Issues:
+-------------
+
+1. "Not Found" when toggling template:
+   - Ensure form is published (status = 'published')
+   - Ensure form exists and is not deleted
+   - Verify user has super_admin role
+
+2. Clone returns empty flow:
+   - Verify template has flow connections
+   - Check template form has questions added
+   - Ensure template is properly published
+
+3. Unauthorized when accessing admin endpoint:
+   - Verify user has super_admin role
+   - Check JWT token is valid and not expired
+   - Ensure using correct Authorization header format
+
+4. Template not appearing in gallery:
+   - Verify is_template = true
+   - Verify form status = 'published'
+   - Verify form is not soft deleted (deleted_at IS NULL)
+
+
+Database Queries for Debugging:
+-------------------------------
+
+-- List all templates:
+SELECT id, title, is_template, status, deleted_at
+FROM forms
+WHERE is_template = true;
+
+-- Check form template status:
+SELECT id, title, is_template, status, published_at
+FROM forms
+WHERE id = 'FORM_ID';
+
+-- Count flow connections for a form:
+SELECT COUNT(*)
+FROM flow_connections
+WHERE form_id = 'FORM_ID' AND deleted_at IS NULL;
+
+-- List questions in a form's flow:
+SELECT q.id, q.question_text, q.type
+FROM questions q
+JOIN flow_connections fc ON fc.question_id = q.id
+WHERE fc.form_id = 'FORM_ID' AND fc.deleted_at IS NULL;
+
+
+================================================================================
+CHANGELOG
+================================================================================
+
+Version 1.0.0 (2026-01-09):
+--------------------------
+- Initial implementation of templates feature
+- Added is_template field to forms table
+- Implemented public template gallery (GET /templates)
+- Implemented super admin template toggle (PATCH /admin/forms/:id/template)
+- Implemented template cloning (POST /templates/:id/clone)
+- Simple backend-driven approach using existing APIs
+- Full flow structure copying during clone
+- Documentation created
+
+
+================================================================================

@@ -184,3 +184,33 @@ func isValidStatus(status string) bool {
 		return false
 	}
 }
+
+/*
+========================
+ TEMPLATE OPERATIONS
+========================
+*/
+
+// ToggleTemplate toggles is_template flag (super admin only)
+func (s *FormsService) ToggleTemplate(
+	ctx context.Context,
+	formID string,
+	isTemplate bool,
+) error {
+	return s.repo.ToggleTemplate(ctx, formID, isTemplate)
+}
+
+// ListTemplates lists all published templates (public)
+func (s *FormsService) ListTemplates(
+	ctx context.Context,
+) ([]Form, error) {
+	return s.repo.ListTemplates(ctx)
+}
+
+// GetTemplateData gets template data for cloning
+func (s *FormsService) GetTemplateData(
+	ctx context.Context,
+	templateID string,
+) (*Form, error) {
+	return s.repo.GetTemplateWithFlow(ctx, templateID)
+}

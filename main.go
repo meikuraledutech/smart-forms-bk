@@ -27,6 +27,15 @@ import (
 
 var db *pgxpool.Pool
 
+// flowRepoAdapter adapts flows.FlowRepository to forms.FlowRepository interface
+type flowRepoAdapter struct {
+	*flows.FlowRepository
+}
+
+func (a *flowRepoAdapter) Create(ctx context.Context, formID, questionID string, parentID *string, orderIndex, depthLevel int, isTerminal bool) (interface{}, error) {
+	return a.FlowRepository.Create(ctx, formID, questionID, parentID, orderIndex, depthLevel, isTerminal)
+}
+
 func main() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
@@ -109,6 +118,9 @@ func main() {
 	flowService := flows.NewFlowService(flowRepo, formCache)
 	flowHandler := flows.NewFlowHandler(flowService)
 
+	// Inject flowRepo into formsHandler for template cloning
+	formsHandler.SetFlowRepo(&flowRepoAdapter{flowRepo})
+
 	linksRepo := links.NewLinksRepository(db)
 	linksService := links.NewLinksService(linksRepo, formCache)
 	linksHandler := links.NewLinksHandler(linksService)
@@ -129,6 +141,7 @@ func main() {
 	app.Get("/f/:slug", linksHandler.GetPublicForm)
 	app.Post("/f/:slug/responses", responsesHandler.SubmitResponse)
 	app.Get("/plans", plansHandler.ListActivePlans) // Public pricing page
+	app.Get("/templates", formsHandler.ListTemplates) // Public template gallery
 
 	// Protect routes
 	api := app.Group("/", auth.JWTAuthMiddleware())
@@ -139,6 +152,9 @@ func main() {
 	api.Get("/forms/:id", formsHandler.GetByID)
 	api.Patch("/forms/:id", formsHandler.Update)
 	api.Patch("/forms/:id/delete", formsHandler.SoftDelete)
+
+	// Template clone (authenticated users)
+	api.Post("/templates/:id/clone", formsHandler.CloneTemplate)
 
 	// Questions routes
 	api.Post("/questions", questionHandler.Create)
@@ -173,6 +189,9 @@ func main() {
 	admin.Get("/plans/:id", plansHandler.GetPlan)
 	admin.Patch("/plans/:id", plansHandler.UpdatePlan)
 	admin.Delete("/plans/:id", plansHandler.DeletePlan)
+
+	// Template management (super admin only)
+	admin.Patch("/forms/:id/template", formsHandler.ToggleTemplate)
 
 	port := os.Getenv("PORT")
 	if port == "" {
